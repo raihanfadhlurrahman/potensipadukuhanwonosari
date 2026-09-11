@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -83,7 +84,7 @@ const KAMPUNG_HISTORIES = [
 ];
 
 const DEFAULT_APARATUR = [
-  { id: "ap-1", nama: "Triswanto", jabatan: "Kepala Dukuh Wonosari", kategori: "Pemerintah Padukuhan", wilayah: "Seluruh Wilayah", nomor_hp: "6285729135249" },
+  { id: "ap-1", nama: "Triswanto", jabatan: "Kepala Dukuh Wonosari", kategori: "Pemerintah Padukuhan", wilayah: "Seluruh Wilayah", nomor_hp: "6285729135249", foto_url: "/images/pakdukuh.png" },
   { id: "ap-2", nama: "Ketua RW 18 Rejosari", jabatan: "Ketua RW 18", kategori: "Pemerintah Padukuhan", wilayah: "Rejosari", nomor_hp: "6281234567818" },
   { id: "ap-3", nama: "Ketua RW 17 Wonosari", jabatan: "Ketua RW 17", kategori: "Pemerintah Padukuhan", wilayah: "Wonosari", nomor_hp: "6281234567817" },
   { id: "ap-4", nama: "Ketua RW 16 Pajangan", jabatan: "Ketua RW 16", kategori: "Pemerintah Padukuhan", wilayah: "Pajangan", nomor_hp: "6281234567816" },
@@ -179,18 +180,27 @@ export default function ProfilDesaPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-3xl border border-[#EF6C85]/20 p-6 sm:p-10 shadow-sm relative overflow-hidden">
             <div className="flex flex-col md:flex-row items-center gap-8">
-              {/* Avatar / Portrait Frame */}
-              <div className="flex-shrink-0 text-center">
-                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-3xl bg-gradient-to-br from-[#EF6C85] via-[#E8A838] to-[#9DB368] p-1.5 shadow-md mx-auto mb-3">
-                  <div className="w-full h-full rounded-[22px] bg-[#FAF6F0] flex flex-col items-center justify-center text-[#1E251E] p-2">
-                    <Users className="w-12 h-12 text-[#EF6C85] mb-1" />
-                    <span className="text-[10px] font-bold text-center leading-tight text-[#1E251E]/70">
-                      Foto Resmi Kepala Dukuh
-                    </span>
+              {/* Avatar / Portrait Frame Full */}
+              <div className="flex-shrink-0 text-center flex flex-col items-center">
+                <div className="relative w-56 sm:w-64 h-80 sm:h-96 rounded-3xl bg-gradient-to-b from-[#FCE8EC] via-[#FFF8EE] to-[#FAF6F0] border-2 border-[#EF6C85]/25 p-3 shadow-md flex items-end justify-center overflow-hidden mb-3 group">
+                  <div className="absolute inset-0 bg-[radial-gradient(#EF6C85_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none" />
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/images/pakdukuh.png"
+                      alt="Triswanto - Kepala Dukuh Wonosari"
+                      fill
+                      className="object-contain object-bottom drop-shadow-xl transition-transform duration-300 group-hover:scale-105"
+                      priority
+                    />
                   </div>
                 </div>
-                <h3 className="text-sm font-extrabold text-[#1E251E]">{profil.nama_dukuh}</h3>
-                <p className="text-[11px] text-[#EF6C85] font-bold">Kepala Padukuhan Wonosari</p>
+                <h3 className="text-base sm:text-lg font-black text-[#1E251E]">
+                  {profil.nama_dukuh === "Bapak Kepala Dukuh Wonosari" ? "Triswanto" : profil.nama_dukuh}
+                </h3>
+                <p className="text-xs sm:text-sm text-[#EF6C85] font-bold">Kepala Padukuhan Wonosari</p>
+                <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium text-[#1E251E]/60 bg-[#FAF6F0] px-2.5 py-0.5 rounded-full border border-[#1E251E]/10">
+                  Pemerintah Padukuhan Wonosari
+                </span>
               </div>
 
               {/* Teks Sambutan */}
@@ -401,9 +411,20 @@ export default function ProfilDesaPage() {
                         key={member.id}
                         className="bg-white rounded-2xl p-4 border border-[#1E251E]/10 flex items-center gap-3 shadow-2xs hover:shadow-sm transition-all"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-[#FCE8EC] text-[#EF6C85] flex items-center justify-center font-black text-xs flex-shrink-0">
-                          {member.jabatan.slice(0, 2).toUpperCase()}
-                        </div>
+                        {member.foto_url ? (
+                          <div className="relative w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 border border-[#EF6C85]/20 bg-[#FAF6F0]">
+                            <Image
+                              src={member.foto_url}
+                              alt={member.nama}
+                              fill
+                              className="object-cover object-top"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-[#FCE8EC] text-[#EF6C85] flex items-center justify-center font-black text-xs flex-shrink-0">
+                            {member.jabatan.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <h4 className="text-xs font-bold text-[#1E251E] truncate">{member.jabatan}</h4>
                           <p className="text-[11px] text-[#1E251E]/60 truncate">{member.nama}</p>

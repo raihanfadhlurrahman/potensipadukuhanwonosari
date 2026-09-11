@@ -71,13 +71,13 @@ export default function Navbar() {
             : "bg-[#FAF6F0]/95 backdrop-blur-md border-b border-[#EF6C85]/10"
         }`}
       >
-        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="w-full px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
           {/* Logo & Branding */}
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 flex-shrink">
             <motion.div
               whileHover={{ rotate: [0, -5, 5, 0] }}
               transition={{ duration: 0.5 }}
-              className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0"
+              className="relative w-8 h-8 sm:w-11 sm:h-11 flex-shrink-0"
             >
               <Image
                 src="/images/logoSleman.png"
@@ -90,7 +90,7 @@ export default function Navbar() {
             <motion.div
               whileHover={{ rotate: [0, 5, -5, 0] }}
               transition={{ duration: 0.5 }}
-              className="relative w-9 h-9 sm:w-11 sm:h-11 flex-shrink-0"
+              className="relative w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0"
             >
               <Image
                 src="/images/logounit_Warna.PNG"
@@ -100,12 +100,12 @@ export default function Navbar() {
                 priority
               />
             </motion.div>
-            <div className="border-l border-[#1E251E]/15 pl-3">
-              <div className="text-xs sm:text-sm font-bold tracking-tight text-[#1E251E] uppercase group-hover:text-[#EF6C85] transition-colors">
+            <div className="border-l border-[#1E251E]/15 pl-2 sm:pl-3 flex flex-col justify-center min-w-0">
+              <div className="text-xs sm:text-sm font-extrabold tracking-tight text-[#1E251E] uppercase group-hover:text-[#EF6C85] transition-colors leading-tight whitespace-nowrap truncate">
                 Padukuhan Wonosari
               </div>
-              <div className="text-[10px] sm:text-xs text-[#9DB368] font-semibold">
-                Kalurahan Wedomartani • KKN UII 73
+              <div className="text-[9px] sm:text-xs text-[#9DB368] font-semibold leading-tight whitespace-nowrap truncate">
+                <span className="hidden xs:inline">Kalurahan </span>Wedomartani • KKN UII 57
               </div>
             </div>
           </Link>
@@ -138,28 +138,28 @@ export default function Navbar() {
           </nav>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
             {currentUser ? (
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Link
                   href="/admin"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#1E251E]/10 text-xs font-bold shadow-2xs hover:border-[#EF6C85] transition-all"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full bg-white border border-[#1E251E]/10 text-xs font-bold shadow-2xs hover:border-[#EF6C85] transition-all"
                   title="Buka Panel Kendali"
                 >
-                  <UserCheck className="w-3.5 h-3.5 text-[#EF6C85]" />
-                  <span className="hidden md:inline">
+                  <UserCheck className="w-3.5 h-3.5 text-[#EF6C85] flex-shrink-0" />
+                  <span className="hidden sm:inline">
                     {currentUser.role === "padukuh"
                       ? "Kepala Dukuh"
                       : currentUser.role === "admin"
                       ? "Admin KKN"
                       : currentUser.full_name.split(" ")[0]}
                   </span>
-                  <span className="md:hidden">Panel</span>
+                  <span className="hidden xs:inline sm:hidden">Panel</span>
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="p-1.5 sm:p-2 rounded-full text-[#1E251E]/60 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                  className="hidden sm:inline-flex p-1.5 sm:p-2 rounded-full text-[#1E251E]/60 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                   title="Keluar (Logout)"
                   aria-label="Logout"
                 >
@@ -169,17 +169,17 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/login"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1E251E] hover:text-[#EF6C85] px-3.5 py-1.5 rounded-full border border-[#1E251E]/15 hover:border-[#EF6C85] bg-white shadow-2xs transition-all"
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#1E251E] hover:text-[#EF6C85] px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full border border-[#1E251E]/15 hover:border-[#EF6C85] bg-white shadow-2xs transition-all"
               >
-                <LogIn className="w-3.5 h-3.5 text-[#EF6C85]" />
-                <span>Masuk</span>
+                <LogIn className="w-3.5 h-3.5 text-[#EF6C85] flex-shrink-0" />
+                <span className="hidden xs:inline">Masuk</span>
               </Link>
             )}
 
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setIsMobileOpen(!isMobileOpen)}
-              className="lg:hidden p-2 rounded-xl hover:bg-[#FCE8EC]/50 transition-colors"
+              className="lg:hidden p-1.5 sm:p-2 rounded-xl hover:bg-[#FCE8EC]/50 transition-colors flex-shrink-0"
               aria-label="Toggle menu"
             >
               <AnimatePresence mode="wait">
@@ -191,7 +191,7 @@ export default function Navbar() {
                     exit={{ rotate: 90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <X className="w-6 h-6 text-[#EF6C85]" />
+                    <X className="w-5 h-5 sm:w-6 sm:h-6 text-[#EF6C85]" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -201,7 +201,7 @@ export default function Navbar() {
                     exit={{ rotate: -90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Menu className="w-6 h-6 text-[#1E251E]" />
+                    <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-[#1E251E]" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -270,6 +270,14 @@ export default function Navbar() {
                         <span className="text-[10px] text-[#1E251E]/50">{currentUser.dusun}</span>
                       </div>
                       <p className="text-xs text-[#1E251E]/70 font-medium truncate">{currentUser.full_name}</p>
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsMobileOpen(false)}
+                        className="w-full py-2.5 rounded-xl bg-[#EF6C85] hover:bg-[#d64e68] text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        <span>Buka Panel Kendali</span>
+                      </Link>
                       <button
                         type="button"
                         onClick={handleLogout}

@@ -161,7 +161,11 @@ export default function ArtikelPage() {
         item.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.author_name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchKategori =
-        selectedKategori === "Semua Kategori" ? true : item.category === selectedKategori;
+        selectedKategori === "Semua Kategori"
+          ? true
+          : selectedKategori === "Sosial & Gotong Royong"
+          ? item.category === "Sosial & Gotong Royong" || item.category === "Gotong Royong"
+          : item.category === selectedKategori;
       return matchSearch && matchKategori;
     });
   }, [articles, searchQuery, selectedKategori]);

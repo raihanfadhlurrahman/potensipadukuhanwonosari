@@ -147,15 +147,23 @@ export default function ProfilNarasi() {
             <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full bg-[#9DB368]/10 blur-[60px]" />
 
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-              <div className="md:col-span-3 flex justify-center">
+              <div className="md:col-span-4 flex justify-center">
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl bg-gradient-to-br from-[#EF6C85]/20 to-[#9DB368]/20 flex items-center justify-center border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                  className="relative w-52 sm:w-60 h-72 sm:h-84 rounded-3xl bg-gradient-to-t from-white/15 via-white/5 to-transparent flex items-end justify-center border border-white/20 overflow-hidden p-3 shadow-2xl backdrop-blur-xs group"
                 >
-                  <div className="text-5xl">👤</div>
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/images/pakdukuh.png"
+                      alt="Triswanto - Kepala Dukuh Wonosari"
+                      fill
+                      className="object-contain object-bottom drop-shadow-2xl transition-transform duration-300 group-hover:scale-105"
+                      priority
+                    />
+                  </div>
                 </motion.div>
               </div>
-              <div className="md:col-span-9">
+              <div className="md:col-span-8">
                 <Quote className="w-8 h-8 text-[#EF6C85]/40 mb-3" />
                 <blockquote className="text-sm sm:text-base text-white/85 leading-relaxed italic mb-4">
                   &ldquo;Padukuhan Wonosari adalah rumah bagi masyarakat yang menjunjung
@@ -166,9 +174,9 @@ export default function ProfilNarasi() {
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-0.5 bg-[#EF6C85]" />
                   <div>
-                    <div className="text-sm font-bold text-white">Kepala Padukuhan Wonosari</div>
-                    <div className="text-xs text-[#9DB368]">
-                      Pemerintah Kalurahan Wedomartani
+                    <div className="text-sm sm:text-base font-black text-white">Triswanto</div>
+                    <div className="text-xs text-[#9DB368] font-semibold">
+                      Kepala Padukuhan Wonosari • Kalurahan Wedomartani
                     </div>
                   </div>
                 </div>

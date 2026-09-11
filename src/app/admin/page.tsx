@@ -3679,6 +3679,7 @@ export default function AdminPage() {
                       <option value="Kegiatan KKN">Kegiatan KKN UII 57</option>
                       <option value="Kesehatan & Posyandu">Kesehatan & Posyandu</option>
                       <option value="Pertanian & UMKM">Pertanian & UMKM</option>
+                      <option value="Sosial & Gotong Royong">Sosial & Gotong Royong</option>
                     </select>
                   </div>
 
