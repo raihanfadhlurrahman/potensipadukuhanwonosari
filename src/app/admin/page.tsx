@@ -139,7 +139,7 @@ export default function AdminPage() {
   // Data 100% dari Supabase Database (Tanpa LocalStorage mock)
   const [queue, setQueue] = useState<PendingItem[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "moderasi" | "riwayat" | "lembaga" | "demografi" | "kebudayaan" | "tambah-wisata" | "tambah-umkm" | "tulis" | "master"
+    "moderasi" | "riwayat" | "lembaga" | "demografi" | "kebudayaan" | "tambah-wisata" | "tambah-umkm" | "tulis" | "prasarana" | "master"
   >("moderasi");
 
   // Moderation history log dari database
@@ -246,6 +246,23 @@ export default function AdminPage() {
   const [isUploadingArtikel, setIsUploadingArtikel] = useState(false);
   const [submitArticleSuccess, setSubmitArticleSuccess] = useState(false);
   const [submitArticleError, setSubmitArticleError] = useState<string | null>(null);
+
+  // Form states & data Sarana & Prasarana (Pak Dukuh, Admin KKN, dan Kontributor)
+  const [prasaranaList, setPrasaranaList] = useState<any[]>([]);
+  const [prasaranaNama, setPrasaranaNama] = useState("");
+  const [prasaranaKategori, setPrasaranaKategori] = useState("Sosial & Budaya");
+  const [prasaranaDusun, setPrasaranaDusun] = useState<"Rejosari" | "Pajangan" | "Wonosari" | "Seluruh Wilayah">("Rejosari");
+  const [prasaranaKondisi, setPrasaranaKondisi] = useState("Baik");
+  const [prasaranaDeskripsi, setPrasaranaDeskripsi] = useState("");
+  const [prasaranaFotoUrl, setPrasaranaFotoUrl] = useState("");
+  const [prasaranaGmapsUrl, setPrasaranaGmapsUrl] = useState("");
+  const [prasaranaPreviewImage, setPrasaranaPreviewImage] = useState<string | null>(null);
+  const [isUploadingPrasarana, setIsUploadingPrasarana] = useState(false);
+  const [isSubmittingPrasarana, setIsSubmittingPrasarana] = useState(false);
+  const [submitPrasaranaSuccess, setSubmitPrasaranaSuccess] = useState(false);
+  const [submitPrasaranaError, setSubmitPrasaranaError] = useState<string | null>(null);
+  const [deletingPrasaranaId, setDeletingPrasaranaId] = useState<string | null>(null);
+  const [deletingArticleId, setDeletingArticleId] = useState<string | null>(null);
 
   // 1. Validasi Autentikasi Pengguna & Kunci Peran (RBAC)
   useEffect(() => {
@@ -557,6 +574,24 @@ export default function AdminPage() {
     }
   }, []);
 
+  // 7. Fetch Sarana & Prasarana langsung dari Database Supabase (sarana_prasarana)
+  const fetchPrasaranaFromDB = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sarana_prasarana")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (data && data.length > 0) {
+        setPrasaranaList(data);
+      } else {
+        setPrasaranaList([]);
+      }
+    } catch (err) {
+      console.warn("Fetch prasarana from DB notice:", err);
+    }
+  }, []);
+
   // Muat data awal dari Supabase saat masuk portal
   useEffect(() => {
     fetchQueueFromDB();
@@ -564,7 +599,8 @@ export default function AdminPage() {
     fetchAparaturFromDB();
     fetchDemografiFromDB();
     fetchKebudayaanFromDB();
-  }, [fetchQueueFromDB, fetchHistoryFromDB, fetchAparaturFromDB, fetchDemografiFromDB, fetchKebudayaanFromDB]);
+    fetchPrasaranaFromDB();
+  }, [fetchQueueFromDB, fetchHistoryFromDB, fetchAparaturFromDB, fetchDemografiFromDB, fetchKebudayaanFromDB, fetchPrasaranaFromDB]);
 
   // Handlers CRUD Kebudayaan (Pak Dukuh & Admin KKN)
   const handleOpenAddKebudayaan = () => {
@@ -1302,6 +1338,175 @@ export default function AdminPage() {
     setTimeout(() => setSubmitArticleSuccess(false), 4500);
   };
 
+  // Upload file handler Sarana & Prasarana
+  const handlePrasaranaFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const localUrl = URL.createObjectURL(file);
+    setPrasaranaPreviewImage(localUrl);
+    setIsUploadingPrasarana(true);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPrasaranaFotoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `prasarana-${Date.now()}.${fileExt}`;
+      const { data, error } = await supabase.storage
+        .from("media-padukuhan")
+        .upload(`prasarana/${fileName}`, file, { cacheControl: "3600", upsert: true });
+
+      if (!error && data) {
+        const { data: publicUrlData } = supabase.storage
+          .from("media-padukuhan")
+          .getPublicUrl(`prasarana/${fileName}`);
+        if (publicUrlData?.publicUrl) {
+          setPrasaranaFotoUrl(publicUrlData.publicUrl);
+        }
+      }
+    } catch (storageErr) {
+      console.warn("Storage upload prasarana notice:", storageErr);
+    } finally {
+      setIsUploadingPrasarana(false);
+    }
+  };
+
+  // Submit Sarana & Prasarana langsung ke Supabase (Pak Dukuh, Admin KKN, dan Kontributor)
+  const handleSubmitPrasarana = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prasaranaNama.trim()) return;
+
+    setIsSubmittingPrasarana(true);
+    setSubmitPrasaranaError(null);
+
+    const namaVal = prasaranaNama.trim();
+    // Gunakan nilai enum standar PostgreSQL ('Rejosari', 'Pajangan', 'Wonosari', 'Seluruh Wilayah')
+    const insertPayload: any = {
+      nama: namaVal,
+      nama_sarana: namaVal,
+      kategori: prasaranaKategori,
+      lokasi_dusun: prasaranaDusun,
+      lokasi: prasaranaDusun,
+      dusun: prasaranaDusun,
+      kondisi: prasaranaKondisi,
+      deskripsi: prasaranaDeskripsi.trim() || null,
+      foto_url: prasaranaFotoUrl || null,
+      gmaps_url: prasaranaGmapsUrl.trim() || null,
+      status: "APPROVED",
+    };
+
+    try {
+      let { error } = await supabase.from("sarana_prasarana").insert([insertPayload]);
+
+      // Fallback dinamis jika ada kolom yang belum terdaftar di skema
+      if (error && (error.code === "PGRST204" || error.code === "42703")) {
+        const fallback = { ...insertPayload };
+        const match = error.message?.match(/'([^']+)' column/) || error.message?.match(/column "([^"]+)" of relation/);
+        if (match && match[1]) {
+          delete fallback[match[1]];
+          const retry = await supabase.from("sarana_prasarana").insert([fallback]);
+          error = retry.error;
+        } else if (error.message?.includes("dusun")) {
+          delete fallback.dusun;
+          const retry = await supabase.from("sarana_prasarana").insert([fallback]);
+          error = retry.error;
+        } else if (error.message?.includes("lokasi_dusun")) {
+          delete fallback.lokasi_dusun;
+          const retry = await supabase.from("sarana_prasarana").insert([fallback]);
+          error = retry.error;
+        } else if (error.message?.includes("lokasi")) {
+          delete fallback.lokasi;
+          const retry = await supabase.from("sarana_prasarana").insert([fallback]);
+          error = retry.error;
+        }
+      }
+
+      // Fallback khusus jika dusun_enum pada database hanya menerima nilai tertentu
+      if (error && error.message?.includes("dusun_enum")) {
+        const fallback = { ...insertPayload, lokasi_dusun: "Wonosari", lokasi: "Wonosari", dusun: "Wonosari" };
+        const retry = await supabase.from("sarana_prasarana").insert([fallback]);
+        error = retry.error;
+      }
+
+      if (error) {
+        console.warn("Insert prasarana error:", error);
+        setSubmitPrasaranaError(error.message || "Gagal menyimpan sarana prasarana ke database.");
+        setIsSubmittingPrasarana(false);
+        return;
+      }
+
+      await fetchPrasaranaFromDB();
+      setSubmitPrasaranaSuccess(true);
+      setAccNotification(`Sarana prasarana "${prasaranaNama}" berhasil ditambahkan ke database!`);
+      setTimeout(() => setAccNotification(null), 4500);
+
+      // Reset form
+      setPrasaranaNama("");
+      setPrasaranaDeskripsi("");
+      setPrasaranaGmapsUrl("");
+      setPrasaranaPreviewImage(null);
+      setTimeout(() => setSubmitPrasaranaSuccess(false), 4500);
+    } catch (err: any) {
+      console.warn("Supabase prasarana error:", err);
+      setSubmitPrasaranaError(err?.message || "Terjadi kesalahan koneksi saat menyimpan prasarana.");
+    } finally {
+      setIsSubmittingPrasarana(false);
+    }
+  };
+
+  // Hapus Sarana & Prasarana dari Supabase (Pak Dukuh & Admin KKN)
+  const handleDeletePrasarana = async (id: string, nama: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus sarana prasarana "${nama}" dari database Supabase?`)) {
+      return;
+    }
+    setDeletingPrasaranaId(id);
+    try {
+      const { error } = await supabase.from("sarana_prasarana").delete().eq("id", id);
+      if (!error) {
+        setPrasaranaList((prev) => prev.filter((p) => String(p.id) !== String(id)));
+        setAccNotification(`Sarana prasarana "${nama}" berhasil dihapus dari database!`);
+        setTimeout(() => setAccNotification(null), 4000);
+      } else {
+        alert(`Gagal menghapus sarana prasarana: ${error.message}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan koneksi saat menghapus: ${err?.message}`);
+    } finally {
+      setDeletingPrasaranaId(null);
+    }
+  };
+
+  // Hapus Warta Berita Permanen dari Database Supabase (Pak Dukuh & Admin KKN)
+  const handleDeleteArticle = async (id: string, title: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus warta "${title}" secara permanen dari database Supabase?`)) {
+      return;
+    }
+    setDeletingArticleId(id);
+    try {
+      const { error } = await supabase.from("artikel").delete().eq("id", id);
+      if (!error) {
+        try {
+          await supabase.from("riwayat_moderasi").delete().eq("item_id", String(id));
+        } catch (_) {}
+
+        setModerationHistory((prev) => prev.filter((item) => String(item.id) !== String(id)));
+        setQueue((prev) => prev.filter((item) => String(item.id) !== String(id)));
+        setAccNotification(`Warta "${title}" berhasil dihapus permanen dari database Supabase!`);
+        setTimeout(() => setAccNotification(null), 4000);
+      } else {
+        alert(`Gagal menghapus warta: ${error.message}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan koneksi: ${err?.message}`);
+    } finally {
+      setDeletingArticleId(null);
+    }
+  };
+
   // CRUD Pemerintahan & Kelembagaan -> Operasi langsung ke Supabase aparatur_desa
   const handleSaveLembaga = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1609,6 +1814,21 @@ export default function AdminPage() {
               <FileText className="w-3.5 h-3.5 text-sky-600" />
               <span>
                 {currentRole === "padukuh" ? "Tambah Warta Berita" : currentRole === "admin" ? "Kelola / Tambah Warta" : "Usulkan Warta Berita"}
+              </span>
+            </button>
+
+            {/* Tab: Sarana & Prasarana (Pak Dukuh, Admin KKN, dan Kontributor) */}
+            <button
+              onClick={() => setActiveTab("prasarana")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === "prasarana"
+                  ? "bg-[#1E251E] text-white shadow-xs"
+                  : "text-[#1E251E]/60 hover:text-[#1E251E] hover:bg-neutral-100"
+              }`}
+            >
+              <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+              <span>
+                {currentRole === "padukuh" ? "Sarana & Prasarana" : currentRole === "admin" ? "Kelola Sarana & Prasarana" : "Tambah Sarana & Prasarana"} ({prasaranaList.length})
               </span>
             </button>
 
@@ -2045,13 +2265,29 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        <div className="text-right sm:self-center">
-                          <span className="text-[11px] font-semibold text-[#1E251E]/50 block">
-                            Penanggung Jawab:
-                          </span>
-                          <span className="text-xs font-bold text-[#EF6C85]">
-                            {item.reviewed_by || "Bapak Kepala Dukuh Wonosari"}
-                          </span>
+                        <div className="text-right sm:self-center flex flex-col items-end gap-2 shrink-0">
+                          <div>
+                            <span className="text-[11px] font-semibold text-[#1E251E]/50 block">
+                              Penanggung Jawab:
+                            </span>
+                            <span className="text-xs font-bold text-[#EF6C85]">
+                              {item.reviewed_by || "Bapak Kepala Dukuh Wonosari"}
+                            </span>
+                          </div>
+
+                          {/* Tombol Hapus Warta dari Database (Pak Dukuh & Admin KKN) */}
+                          {(currentRole === "padukuh" || currentRole === "admin") && item.type === "artikel" && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteArticle(String(item.id), item.title)}
+                              disabled={deletingArticleId === String(item.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                              title="Hapus warta ini permanen dari database Supabase"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{deletingArticleId === String(item.id) ? "Menghapus..." : "Hapus Warta"}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -3828,6 +4064,415 @@ export default function AdminPage() {
                   </span>
                 </button>
               </form>
+
+              {/* Daftar Warta Berita Terbit & Hapus Warta (Pak Dukuh & Admin KKN) */}
+              {(currentRole === "padukuh" || currentRole === "admin") && (
+                <div className="mt-10 pt-8 border-t border-[#1E251E]/10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-[#1E251E] flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-sky-600" />
+                        <span>Daftar Warta Berita Aktif di Database</span>
+                      </h4>
+                      <p className="text-xs text-[#1E251E]/60 mt-0.5">
+                        Kelola dan hapus warta berita yang sudah terbit di website padukuhan.
+                      </p>
+                    </div>
+                    <Link
+                      href="/artikel"
+                      className="text-xs font-bold text-[#EF6C85] flex items-center gap-1 hover:underline"
+                    >
+                      <span>Buka Halaman Publik Warta</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {moderationHistory.filter((item) => item.type === "artikel").length === 0 ? (
+                      <div className="p-5 rounded-2xl bg-[#FAF6F0] text-center text-xs text-[#1E251E]/50">
+                        Belum ada warta berita tersimpan di database.
+                      </div>
+                    ) : (
+                      moderationHistory
+                        .filter((item) => item.type === "artikel")
+                        .map((art) => (
+                          <div
+                            key={art.id}
+                            className="p-3.5 rounded-2xl bg-[#FAF6F0] border border-[#1E251E]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              {art.foto_url && (
+                                <img
+                                  src={art.foto_url}
+                                  alt={art.title}
+                                  className="w-12 h-12 rounded-xl object-cover border border-[#1E251E]/10 shrink-0"
+                                />
+                              )}
+                              <div>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                    {art.status}
+                                  </span>
+                                  <span className="text-[10px] text-[#1E251E]/50">{art.date}</span>
+                                </div>
+                                <h5 className="text-xs font-bold text-[#1E251E] line-clamp-1">{art.title}</h5>
+                                <span className="text-[10px] text-[#1E251E]/60">Penulis: {art.submitter}</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteArticle(String(art.id), art.title)}
+                              disabled={deletingArticleId === String(art.id)}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold transition-all cursor-pointer shrink-0 self-end sm:self-auto"
+                              title="Hapus warta ini permanen dari Supabase"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{deletingArticleId === String(art.id) ? "Menghapus..." : "Hapus Warta"}</span>
+                            </button>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: KELOLA SARANA & PRASARANA (PAK DUKUH, ADMIN KKN, & KONTRIBUTOR) */}
+          {activeTab === "prasarana" && (
+            <div className="space-y-8">
+              {/* Header & Deskripsi */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-black text-[#1E251E] flex items-center gap-2">
+                    <Landmark className="w-5 h-5 text-emerald-600" />
+                    <span>Sarana & Prasarana Padukuhan Wonosari (Database Live)</span>
+                  </h2>
+                  <p className="text-xs text-[#1E251E]/60 mt-0.5">
+                    Inventaris fasilitas ibadah, sosial, keamanan, sanitasi, dan pertanian. Tersimpan langsung di Supabase.
+                  </p>
+                </div>
+                <Link
+                  href="/monografis"
+                  className="px-4 py-2 rounded-xl bg-white border border-[#1E251E]/10 hover:bg-[#FAF6F0] text-xs font-bold text-[#1E251E] flex items-center gap-1.5 transition-all shadow-2xs self-start sm:self-auto"
+                >
+                  <span>Lihat Tampilan Publik Monografis</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              {/* Form Tambah Sarana & Prasarana */}
+              <div className="bg-white rounded-3xl border border-[#1E251E]/10 p-6 sm:p-8 shadow-xs">
+                <div className="max-w-xl mb-6">
+                  <h3 className="text-base font-extrabold text-[#1E251E] flex items-center gap-2">
+                    <PlusCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Tambah Inventaris Sarana & Prasarana Baru</span>
+                  </h3>
+                  <p className="text-xs text-[#1E251E]/60 mt-0.5">
+                    Formulir penambahan fasilitas umum padukuhan. Terbuka untuk Pak Dukuh, Admin KKN, dan Kontributor.
+                  </p>
+                </div>
+
+                {submitPrasaranaSuccess && (
+                  <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Sarana & prasarana berhasil ditambahkan ke database Supabase dan langsung tampil di halaman monografis!</span>
+                  </div>
+                )}
+
+                {submitPrasaranaError && (
+                  <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{submitPrasaranaError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmitPrasarana} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Nama Fasilitas */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#1E251E] mb-1.5">
+                        Nama Sarana / Prasarana <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={prasaranaNama}
+                        onChange={(e) => setPrasaranaNama(e.target.value)}
+                        placeholder="Contoh: Balai Padukuhan, Lapangan Bola, Pos Ronda RT 03"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+
+                    {/* Kategori */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#1E251E] mb-1.5">
+                        Kategori Fasilitas <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={prasaranaKategori}
+                        onChange={(e) => setPrasaranaKategori(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600 cursor-pointer"
+                      >
+                        <option value="Sosial & Budaya">Sosial & Budaya (Balai, Gedung Serbaguna)</option>
+                        <option value="Tempat Ibadah">Tempat Ibadah (Masjid, Mushola)</option>
+                        <option value="Kelestarian Lingkungan">Kelestarian Lingkungan (Bank Sampah, TPS)</option>
+                        <option value="Ketertiban & Keamanan">Ketertiban & Keamanan (Pos Ronda, Kamling)</option>
+                        <option value="Infrastruktur Pertanian">Infrastruktur Pertanian (Irigasi, DAM)</option>
+                        <option value="Olahraga & Pemuda">Olahraga & Pemuda (Lapangan, GOR)</option>
+                        <option value="Fasilitas Umum">Fasilitas Umum Lainnya</option>
+                      </select>
+                    </div>
+
+                    {/* Wilayah / Lokasi Dusun */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#1E251E] mb-1.5 flex items-center justify-between">
+                        <span>
+                          Lokasi Dusun <span className="text-rose-500">*</span>
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
+                          Pilihan Standar
+                        </span>
+                      </label>
+                      <select
+                        value={prasaranaDusun}
+                        onChange={(e) => setPrasaranaDusun(e.target.value as any)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600 cursor-pointer font-semibold"
+                      >
+                        <option value="Rejosari">Rejosari (RW 18)</option>
+                        <option value="Pajangan">Pajangan (RW 16)</option>
+                        <option value="Wonosari">Wonosari (RW 17)</option>
+                        <option value="Seluruh Wilayah">Ketiga Dusun / Seluruh Wilayah</option>
+                      </select>
+                      <p className="text-[10px] text-[#1E251E]/50 mt-1">
+                        Pilih dusun lokasi fasilitas (Rejosari RW 18, Pajangan RW 16, Wonosari RW 17, atau Ketiga Dusun).
+                      </p>
+                    </div>
+
+                    {/* Kondisi */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#1E251E] mb-1.5">
+                        Kondisi Sarana
+                      </label>
+                      <select
+                        value={prasaranaKondisi}
+                        onChange={(e) => setPrasaranaKondisi(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600 cursor-pointer"
+                      >
+                        <option value="Sangat Baik">Sangat Baik</option>
+                        <option value="Baik">Baik</option>
+                        <option value="Terawat">Terawat</option>
+                        <option value="Aktif">Aktif</option>
+                        <option value="Cukup Baik">Cukup Baik</option>
+                        <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Deskripsi Singkat */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#1E251E] mb-1.5">
+                      Deskripsi Singkat Fasilitas
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prasaranaDeskripsi}
+                      onChange={(e) => setPrasaranaDeskripsi(e.target.value)}
+                      placeholder="Jelaskan fungsi utama fasilitas, kapasitas, atau kegiatan rutin warga di lokasi ini..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600 resize-none"
+                    />
+                  </div>
+
+                  {/* URL Google Maps */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#1E251E] mb-1.5 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#EF6C85]" />
+                      <span>Tautan Titik Lokasi Google Maps</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={prasaranaGmapsUrl}
+                      onChange={(e) => setPrasaranaGmapsUrl(e.target.value)}
+                      placeholder="https://maps.app.goo.gl/... atau https://maps.google.com/?q=..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6F0] border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  {/* Foto Sarana & Prasarana (Upload / URL) */}
+                  <div className="p-4 rounded-2xl bg-[#FAF6F0]/60 border border-[#1E251E]/10 space-y-3">
+                    <label className="block text-xs font-bold text-[#1E251E] flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>Foto Fasilitas (Unggah File atau Tautan Gambar)</span>
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePrasaranaFileChange}
+                          className="text-xs text-[#1E251E]/70 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#1E251E] file:text-white hover:file:bg-neutral-800 cursor-pointer"
+                        />
+                        {isUploadingPrasarana && (
+                          <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                            Sedang mengunggah foto ke storage...
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <input
+                          type="url"
+                          value={prasaranaFotoUrl}
+                          onChange={(e) => {
+                            setPrasaranaFotoUrl(e.target.value);
+                            setPrasaranaPreviewImage(e.target.value);
+                          }}
+                          placeholder="Atau tempel URL gambar langsung (https://...)"
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs text-[#1E251E]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Preview Foto */}
+                    {(prasaranaPreviewImage || prasaranaFotoUrl) && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <img
+                          src={prasaranaPreviewImage || prasaranaFotoUrl}
+                          alt="Preview Sarana"
+                          className="w-20 h-20 rounded-xl object-cover border border-[#1E251E]/10"
+                        />
+                        <span className="text-[11px] text-[#1E251E]/60 font-medium">
+                          Pratinjau tampilan foto fasilitas
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tombol Simpan */}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPrasarana || isUploadingPrasarana}
+                    className="w-full py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4 text-emerald-300" />
+                    <span>
+                      {isSubmittingPrasarana ? "Menyimpan ke Supabase..." : "Simpan Sarana & Prasarana ke Database"}
+                    </span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Daftar Inventaris Fasilitas yang Sudah Ada di Database */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[#1E251E] flex items-center gap-2">
+                      <Landmark className="w-4 h-4 text-[#EF6C85]" />
+                      <span>Daftar Sarana & Prasarana Terdaftar ({prasaranaList.length})</span>
+                    </h3>
+                    <p className="text-xs text-[#1E251E]/60 mt-0.5">
+                      Data fasilitas umum padukuhan yang aktif tersimpan di Supabase.
+                    </p>
+                  </div>
+                </div>
+
+                {prasaranaList.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-3xl border border-[#1E251E]/10 p-8 text-xs text-[#1E251E]/50">
+                    Belum ada data sarana & prasarana di database Supabase.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {prasaranaList.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-3xl border border-[#1E251E]/10 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="relative h-40 w-full bg-[#FAF6F0] overflow-hidden border-b border-[#1E251E]/5 flex items-center justify-center">
+                            {item.foto_url ? (
+                              <img
+                                src={item.foto_url}
+                                alt={item.nama}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-[#1E251E]/30 gap-1 p-4 text-center">
+                                <Landmark className="w-7 h-7 text-[#1E251E]/20" />
+                                <span className="text-[10px] font-bold">Tanpa Foto</span>
+                              </div>
+                            )}
+                            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                              <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-white/95 text-[#1E251E] shadow-2xs">
+                                {item.kategori}
+                              </span>
+                              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full shadow-2xs">
+                                {item.kondisi}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-4">
+                            <h4 className="text-sm font-black text-[#1E251E] mb-1.5 line-clamp-1">
+                              {item.nama || item.nama_sarana || "Fasilitas Umum"}
+                            </h4>
+                            {item.deskripsi && (
+                              <p className="text-xs text-[#1E251E]/70 line-clamp-2 mb-3">
+                                {item.deskripsi}
+                              </p>
+                            )}
+                            <div className="text-[11px] text-[#1E251E]/60 flex items-center gap-1 font-semibold">
+                              <MapPin className="w-3.5 h-3.5 text-[#EF6C85] shrink-0" />
+                              <span className="truncate">
+                                {item.lokasi === "Rejosari" || item.lokasi_dusun === "Rejosari"
+                                  ? "Rejosari (RW 18)"
+                                  : item.lokasi === "Pajangan" || item.lokasi_dusun === "Pajangan"
+                                  ? "Pajangan (RW 16)"
+                                  : item.lokasi === "Wonosari" || item.lokasi_dusun === "Wonosari"
+                                  ? "Wonosari (RW 17)"
+                                  : item.lokasi === "Seluruh Wilayah" || item.lokasi_dusun === "Seluruh Wilayah"
+                                  ? "Ketiga Dusun (Seluruh Wilayah)"
+                                  : item.lokasi || item.lokasi_dusun || "Padukuhan Wonosari"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 pt-3 border-t border-[#1E251E]/5 flex items-center justify-between gap-2">
+                          {item.gmaps_url ? (
+                            <a
+                              href={item.gmaps_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:underline"
+                            >
+                              <span>Buka Maps</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-[#1E251E]/40 italic">Maps belum diisi</span>
+                          )}
+
+                          {/* Tombol Hapus Fasilitas (Pak Dukuh & Admin KKN) */}
+                          {(currentRole === "padukuh" || currentRole === "admin") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePrasarana(String(item.id), item.nama || item.nama_sarana || "Fasilitas")}
+                              disabled={deletingPrasaranaId === String(item.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer border border-rose-200"
+                              title="Hapus fasilitas ini dari database"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{deletingPrasaranaId === String(item.id) ? "..." : "Hapus"}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

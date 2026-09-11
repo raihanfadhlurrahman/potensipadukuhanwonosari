@@ -25,8 +25,10 @@ import {
   CheckCircle2,
   Inbox,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getStoredUser, UserProfile } from "@/lib/auth";
 
 interface ArticleItem {
   id: string | number;
@@ -71,6 +73,46 @@ export default function ArtikelPage() {
   const [readModal, setReadModal] = useState<ArticleItem | null>(null);
   const [modalPhotoIdx, setModalPhotoIdx] = useState(0);
   const [activePhotoModal, setActivePhotoModal] = useState<GaleriItem | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, []);
+
+  const isLeaderOrAdmin = currentUser?.role === "padukuh" || currentUser?.role === "admin";
+
+  const handleDeleteArticle = async (id: string | number, title: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus warta "${title}" secara permanen dari database Supabase?`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      const { error } = await supabase.from("artikel").delete().eq("id", id);
+      if (!error) {
+        try {
+          await supabase.from("riwayat_moderasi").delete().eq("item_id", String(id));
+        } catch (_) {}
+
+        setArticles((prev) => prev.filter((a) => a.id !== id));
+        if (readModal && readModal.id === id) {
+          setReadModal(null);
+        }
+        setDeleteNotice(`Warta "${title}" berhasil dihapus permanen dari Supabase!`);
+        setTimeout(() => setDeleteNotice(null), 4000);
+      } else {
+        alert(`Gagal menghapus warta dari database: ${error.message}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan koneksi saat menghapus warta: ${err?.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     async function loadArticles() {
@@ -232,6 +274,13 @@ export default function ArtikelPage() {
                 <span>+ Usulkan Warta / Foto</span>
               </Link>
             </div>
+
+            {deleteNotice && (
+              <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fade-in shadow-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{deleteNotice}</span>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -386,22 +435,39 @@ export default function ArtikelPage() {
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-[#1E251E]/5 flex items-center justify-between">
-                        <div className="text-[11px] text-[#1E251E]/60 font-medium flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-[#9DB368]" />
-                          <span>{item.author_name}</span>
+                      <div className="pt-4 border-t border-[#1E251E]/5 flex items-center justify-between gap-2">
+                        <div className="text-[11px] text-[#1E251E]/60 font-medium flex items-center gap-1.5 truncate">
+                          <User className="w-3.5 h-3.5 text-[#9DB368] shrink-0" />
+                          <span className="truncate">{item.author_name}</span>
                         </div>
 
-                        <button
-                          onClick={() => {
-                            setReadModal(item);
-                            setModalPhotoIdx(0);
-                          }}
-                          className="px-4 py-2 rounded-xl bg-[#FAF6F0] hover:bg-[#FCE8EC] text-[#EF6C85] text-xs font-bold flex items-center gap-1.5 transition-colors"
-                        >
-                          <span>Baca Warta</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isLeaderOrAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteArticle(item.id, item.title);
+                              }}
+                              disabled={deletingId === item.id}
+                              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold flex items-center gap-1.5 transition-colors border border-rose-200 cursor-pointer"
+                              title="Hapus warta ini dari database Supabase"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{deletingId === item.id ? "Menghapus..." : "Hapus"}</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setReadModal(item);
+                              setModalPhotoIdx(0);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-[#FAF6F0] hover:bg-[#FCE8EC] text-[#EF6C85] text-xs font-bold flex items-center gap-1.5 transition-colors"
+                          >
+                            <span>Baca Warta</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -610,10 +676,21 @@ export default function ArtikelPage() {
                 )}
               </div>
 
-              <div className="mt-8 pt-4 border-t border-[#1E251E]/10 flex justify-end">
+              <div className="mt-8 pt-4 border-t border-[#1E251E]/10 flex flex-wrap items-center justify-between gap-3">
+                {isLeaderOrAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteArticle(readModal.id, readModal.title)}
+                    disabled={deletingId === readModal.id}
+                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold flex items-center gap-1.5 transition-colors border border-rose-200 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>{deletingId === readModal.id ? "Menghapus dari Supabase..." : "Hapus Warta dari Database"}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setReadModal(null)}
-                  className="px-5 py-2.5 rounded-xl bg-[#1E251E] text-white text-xs font-bold hover:bg-[#1E251E]/90"
+                  className="px-5 py-2.5 rounded-xl bg-[#1E251E] text-white text-xs font-bold hover:bg-[#1E251E]/90 ml-auto"
                 >
                   Tutup Warta
                 </button>

@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Landmark,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -148,21 +149,28 @@ const DEFAULT_DEMOGRAFI: RTDemografi[] = [
   },
 ];
 
-const SARANA_PRASARANA = [
-  { nama: "Balai Padukuhan Wonosari", kategori: "Sosial & Budaya", lokasi: "Wonosari (RW 17)", kondisi: "Sangat Baik" },
-  { nama: "Masjid Al-Ikhlas Rejosari", kategori: "Tempat Ibadah", lokasi: "Rejosari (RW 18)", kondisi: "Baik" },
-  { nama: "Mushola Al-Huda Pajangan", kategori: "Tempat Ibadah", lokasi: "Pajangan (RW 16)", kondisi: "Baik" },
-  { nama: "Bank Sampah BASAH Rejosari", kategori: "Kelestarian Lingkungan", lokasi: "Rejosari (RW 18)", kondisi: "Sangat Baik" },
-  { nama: "Pos Kamling & Ronda RT 01-05", kategori: "Ketertiban & Keamanan", lokasi: "Tersebar di 5 RT", kondisi: "Aktif" },
-  { nama: "Saluran Irigasi Teknis Sawah", kategori: "Infrastruktur Pertanian", lokasi: "Rejosari & Pajangan", kondisi: "Terawat" },
-];
+export interface SaranaPrasaranaItem {
+  id?: string;
+  nama?: string;
+  nama_sarana?: string;
+  kategori: string;
+  lokasi?: string;
+  lokasi_dusun?: string;
+  kondisi: string;
+  deskripsi?: string;
+  foto_url?: string;
+  gmaps_url?: string;
+}
 
 export default function MonografisPage() {
   const [dataRT, setDataRT] = useState<RTDemografi[]>(DEFAULT_DEMOGRAFI);
+  const [saranaList, setSaranaList] = useState<SaranaPrasaranaItem[]>([]);
+  const [isLoadingSarana, setIsLoadingSarana] = useState(true);
   const [activeDusunFilter, setActiveDusunFilter] = useState("Semua");
 
   useEffect(() => {
-    async function loadDemografi() {
+    async function loadData() {
+      // 1. Muat Demografi RT
       try {
         const { data } = await supabase.from("demografi_wilayah").select("*").order("rt", { ascending: true });
         if (data && data.length > 0) {
@@ -171,8 +179,28 @@ export default function MonografisPage() {
       } catch (err) {
         console.warn("Demografi fetch notice:", err);
       }
+
+      // 2. Muat Sarana & Prasarana 100% dari Supabase
+      try {
+        setIsLoadingSarana(true);
+        const { data: prasaranaData, error: prasaranaErr } = await supabase
+          .from("sarana_prasarana")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!prasaranaErr && prasaranaData) {
+          setSaranaList(prasaranaData);
+        } else {
+          setSaranaList([]);
+        }
+      } catch (err) {
+        console.warn("Sarana prasarana fetch notice:", err);
+        setSaranaList([]);
+      } finally {
+        setIsLoadingSarana(false);
+      }
     }
-    loadDemografi();
+    loadData();
   }, []);
 
   // Agregat perhitungan statistik
@@ -432,30 +460,99 @@ export default function MonografisPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {SARANA_PRASARANA.map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-3xl border border-[#1E251E]/10 p-5 shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FAF6F0] text-[#1E251E]/70 border border-[#1E251E]/10">
-                      {item.kategori}
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                      {item.kondisi}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-extrabold text-[#1E251E] mb-1">{item.nama}</h4>
-                </div>
-                <div className="pt-3 border-t border-[#1E251E]/5 text-[11px] text-[#1E251E]/60 flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-[#EF6C85]" />
-                  <span>{item.lokasi}</span>
-                </div>
+          {isLoadingSarana ? (
+            <div className="text-center py-12 bg-white rounded-3xl border border-[#1E251E]/10 p-8 text-xs text-[#1E251E]/50">
+              Memuat inventaris sarana & prasarana dari database Supabase...
+            </div>
+          ) : saranaList.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-3xl border border-[#1E251E]/10 p-8">
+              <div className="w-12 h-12 rounded-2xl bg-[#EBF2DC] text-[#4D6328] flex items-center justify-center mx-auto mb-3">
+                <Landmark className="w-6 h-6" />
               </div>
-            ))}
-          </div>
+              <h3 className="text-sm font-bold text-[#1E251E] mb-1">Belum Ada Sarana & Prasarana</h3>
+              <p className="text-xs text-[#1E251E]/60 max-w-sm mx-auto">
+                Data fasilitas umum belum ditambahkan di database Supabase. Pengurus padukuhan atau kontributor dapat menambahkannya melalui panel admin.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {saranaList.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  className="bg-white rounded-3xl border border-[#1E251E]/10 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                >
+                  <div>
+                    {/* Foto Fasilitas (100% Dari Database Supabase) */}
+                    <div className="relative h-44 w-full bg-[#FAF6F0] overflow-hidden border-b border-[#1E251E]/5 flex items-center justify-center">
+                      {item.foto_url ? (
+                        <img
+                          src={item.foto_url}
+                          alt={item.nama || item.nama_sarana || "Sarana Prasarana"}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-[#1E251E]/30 gap-1.5 p-4 text-center">
+                          <Landmark className="w-8 h-8 text-[#1E251E]/20" />
+                          <span className="text-[10px] font-bold">Tanpa Foto</span>
+                        </div>
+                      )}
+                      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+                        <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md text-[#1E251E] shadow-xs border border-white/50">
+                          {item.kategori}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50/95 backdrop-blur-md px-2.5 py-1 rounded-full shadow-xs border border-emerald-200">
+                          {item.kondisi}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info Konten */}
+                    <div className="p-5">
+                      <h4 className="text-base font-extrabold text-[#1E251E] mb-2 group-hover:text-[#EF6C85] transition-colors line-clamp-1">
+                        {item.nama || item.nama_sarana || "Fasilitas Umum"}
+                      </h4>
+                      {item.deskripsi && (
+                        <p className="text-xs text-[#1E251E]/70 leading-relaxed line-clamp-3 mb-4">
+                          {item.deskripsi}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer: Lokasi & Tombol Gmaps */}
+                  <div className="px-5 pb-5 pt-3 border-t border-[#1E251E]/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-[11px] font-semibold text-[#1E251E]/60 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#EF6C85] shrink-0" />
+                      <span className="truncate">
+                        {item.lokasi === "Rejosari" || item.lokasi_dusun === "Rejosari"
+                          ? "Rejosari (RW 18)"
+                          : item.lokasi === "Pajangan" || item.lokasi_dusun === "Pajangan"
+                          ? "Pajangan (RW 16)"
+                          : item.lokasi === "Wonosari" || item.lokasi_dusun === "Wonosari"
+                          ? "Wonosari (RW 17)"
+                          : item.lokasi === "Seluruh Wilayah" || item.lokasi_dusun === "Seluruh Wilayah"
+                          ? "Ketiga Dusun (Seluruh Wilayah)"
+                          : item.lokasi || item.lokasi_dusun || "Padukuhan Wonosari"}
+                      </span>
+                    </div>
+
+                    {item.gmaps_url && (
+                      <a
+                        href={item.gmaps_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF6F0] hover:bg-[#FCE8EC] text-[#1E251E] hover:text-[#EF6C85] border border-[#1E251E]/10 text-xs font-bold transition-all shrink-0"
+                        title={`Buka peta ${item.nama || item.nama_sarana || "Fasilitas"}`}
+                      >
+                        <span>Google Maps</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

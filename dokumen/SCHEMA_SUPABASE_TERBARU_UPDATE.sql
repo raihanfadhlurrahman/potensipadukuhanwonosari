@@ -355,6 +355,23 @@ CREATE TABLE IF NOT EXISTS riwayat_moderasi (
 );
 
 -- ==============================================================================
+-- 15.5. TABEL SARANA & PRASARANA PADUKUHAN
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS sarana_prasarana (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nama TEXT NOT NULL,
+    kategori TEXT NOT NULL DEFAULT 'Fasilitas Umum',
+    lokasi TEXT,
+    kondisi TEXT DEFAULT 'Baik',
+    deskripsi TEXT,
+    foto_url TEXT,
+    gmaps_url TEXT,
+    status TEXT DEFAULT 'APPROVED',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
 -- 16. PENGATURAN ROW LEVEL SECURITY (RLS) - PERMISIF UNTUK KLIEN WEB RESMI
 -- ==============================================================================
 -- Mengaktifkan RLS
@@ -372,6 +389,7 @@ ALTER TABLE stunting_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE galeri_desa ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE riwayat_moderasi ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sarana_prasarana ENABLE ROW LEVEL SECURITY;
 
 -- Reset dan buat policy terbuka agar aplikasi web frontend dapat membaca & menulis data dengan lancar
 DO $$ 
@@ -380,7 +398,8 @@ DECLARE
     tables text[] := ARRAY[
         'profil_padukuhan', 'pengaturan_web', 'aparatur_desa', 'demografi_wilayah',
         'artikel', 'umkm', 'destinasi_wisata', 'agenda_budaya', 'jadwal_posyandu',
-        'kader_kesehatan', 'stunting_records', 'galeri_desa', 'users', 'riwayat_moderasi'
+        'kader_kesehatan', 'stunting_records', 'galeri_desa', 'users', 'riwayat_moderasi',
+        'sarana_prasarana'
     ];
 BEGIN
     FOREACH tbl IN ARRAY tables LOOP
@@ -427,9 +446,9 @@ INSERT INTO pengaturan_web (
 ) VALUES (
     1,
     'Padukuhan Wonosari, Kalurahan Wedomartani, Kapanewon Ngemplak, Kabupaten Sleman, D.I. Yogyakarta 55584',
-    '6281234567890',
+    '6285729135249',
     'padukuhan.wonosari.sleman@gmail.com',
-    'Senin - Jumat: 08.00 - 15.00 WIB',
+    'Senin - Jumat: 08.00 - 22.00 WIB',
     TRUE,
     'Selamat Datang di Portal Resmi Padukuhan Wonosari — KKN UII Angkatan 73 Unit 57'
 ) ON CONFLICT (id) DO UPDATE SET alamat_balai = EXCLUDED.alamat_balai, whatsapp_resmi = EXCLUDED.whatsapp_resmi;
