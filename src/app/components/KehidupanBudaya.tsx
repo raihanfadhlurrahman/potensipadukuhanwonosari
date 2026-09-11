@@ -9,7 +9,7 @@ const galleryItems = [
   {
     icon: Wheat,
     title: "Panen Raya Padi",
-    subtitle: "Kampung Rejosari (RW 18)",
+    subtitle: "Dusun Rejosari (RW 18)",
     description: "Warga bergotong-royong memanen padi di sawah irigasi yang subur.",
     category: "Pertanian",
     color: "sage",
@@ -33,7 +33,7 @@ const galleryItems = [
   {
     icon: Baby,
     title: "Posyandu Balita Aktif",
-    subtitle: "Kampung Wonosari (RW 17)",
+    subtitle: "Dusun Wonosari (RW 17)",
     description: "Kegiatan penimbangan dan pemantauan tumbuh kembang balita tiap bulan.",
     category: "Kesehatan",
     color: "coral",
@@ -49,7 +49,7 @@ const galleryItems = [
   {
     icon: PartyPopper,
     title: "Kenduri & Syukuran",
-    subtitle: "Kampung Pajangan (RW 16)",
+    subtitle: "Dusun Pajangan (RW 16)",
     description: "Tradisi kenduri nasi tumpeng dalam merayakan kebersamaan warga.",
     category: "Tradisi",
     color: "coral",

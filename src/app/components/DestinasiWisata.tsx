@@ -44,7 +44,7 @@ const destinasiData = [
     description:
       "Program pengelolaan sampah warga yang bisa menjadi destinasi wisata edukasi lingkungan. Belajar langsung proses pemilahan, pencatatan, dan pemanfaatan ulang limbah rumah tangga.",
     activities: ["Edukasi Sampah", "Workshop Daur Ulang", "Tour Lingkungan"],
-    distance: "Kampung Rejosari",
+    distance: "Dusun Rejosari",
     color: "coral",
   },
 ];

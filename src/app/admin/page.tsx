@@ -55,10 +55,27 @@ export interface PendingItem {
   rawUmkm?: any;
   rawWisata?: any;
   rawArtikel?: any;
-  foto_url?: string;
+  foto_url?: string | null;
+  foto_urls?: string[];
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
+}
+
+export function parseArticlePhotos(rawCover: any): string[] {
+  if (!rawCover) return [];
+  if (Array.isArray(rawCover)) return rawCover.filter(Boolean);
+  if (typeof rawCover === "string") {
+    const trimmed = rawCover.trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch (e) {}
+    }
+    return [trimmed];
+  }
+  return [];
 }
 
 export interface AparaturItem {
@@ -122,7 +139,7 @@ export default function AdminPage() {
   // Data 100% dari Supabase Database (Tanpa LocalStorage mock)
   const [queue, setQueue] = useState<PendingItem[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "moderasi" | "riwayat" | "lembaga" | "demografi" | "tambah-wisata" | "tambah-umkm" | "tulis" | "master"
+    "moderasi" | "riwayat" | "lembaga" | "demografi" | "kebudayaan" | "tambah-wisata" | "tambah-umkm" | "tulis" | "master"
   >("moderasi");
 
   // Moderation history log dari database
@@ -193,6 +210,17 @@ export default function AdminPage() {
   const [submitUmkmSuccess, setSubmitUmkmSuccess] = useState(false);
   const [submitUmkmError, setSubmitUmkmError] = useState<string | null>(null);
 
+  // State Kebudayaan dari Supabase agenda_budaya (Pak Dukuh & Admin)
+  const [kebudayaanList, setKebudayaanList] = useState<any[]>([]);
+  const [showAddKebudayaanModal, setShowAddKebudayaanModal] = useState(false);
+  const [kebudayaanJudul, setKebudayaanJudul] = useState("");
+  const [kebudayaanKategori, setKebudayaanKategori] = useState("Tradisi & Adat");
+  const [kebudayaanDusun, setKebudayaanDusun] = useState<"Wonosari" | "Rejosari" | "Pajangan" | "Seluruh Wilayah">("Wonosari");
+  const [kebudayaanDeskripsi, setKebudayaanDeskripsi] = useState("");
+  const [kebudayaanFotoUrl, setKebudayaanFotoUrl] = useState("");
+  const [kebudayaanPreviewImage, setKebudayaanPreviewImage] = useState<string | null>(null);
+  const [isSubmittingKebudayaan, setIsSubmittingKebudayaan] = useState(false);
+
   // Form states usulan Wisata
   const [wisataNama, setWisataNama] = useState("");
   const [wisataKategori, setWisataKategori] = useState("Wisata Alam & Pertanian");
@@ -206,13 +234,16 @@ export default function AdminPage() {
   const [submitWisataSuccess, setSubmitWisataSuccess] = useState(false);
   const [submitWisataError, setSubmitWisataError] = useState<string | null>(null);
 
-  // Form states usulan warta berita
+  // Form states usulan warta berita (Dukungan Lebih Dari 1 Foto)
   const [judulArtikel, setJudulArtikel] = useState("");
   const [kategoriArtikel, setKategoriArtikel] = useState("Kabar Desa");
   const [penulis, setPenulis] = useState("");
   const [isiArtikel, setIsiArtikel] = useState("");
-  const [artikelFotoUrl, setArtikelFotoUrl] = useState("https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=800&auto=format&fit=crop");
-  const [artikelPreviewImage, setArtikelPreviewImage] = useState<string | null>(null);
+  const [artikelFotoList, setArtikelFotoList] = useState<string[]>([
+    "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=800&auto=format&fit=crop",
+  ]);
+  const [artikelUrlInput, setArtikelUrlInput] = useState("");
+  const [isUploadingArtikel, setIsUploadingArtikel] = useState(false);
   const [submitArticleSuccess, setSubmitArticleSuccess] = useState(false);
   const [submitArticleError, setSubmitArticleError] = useState<string | null>(null);
 
@@ -308,6 +339,7 @@ export default function AdminPage() {
 
       if (artikelData) {
         artikelData.forEach((a: any) => {
+          const parsedPhotos = parseArticlePhotos(a.cover_image);
           items.push({
             id: a.id,
             type: "artikel",
@@ -315,7 +347,8 @@ export default function AdminPage() {
             submitter: a.author_name || "Kontributor Warga",
             date: a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID") : "Hari Ini",
             excerpt: a.excerpt || a.content.slice(0, 100),
-            foto_url: a.cover_image,
+            foto_url: parsedPhotos[0] || null,
+            foto_urls: parsedPhotos,
             rawArtikel: a,
             status: "PENDING",
           });
@@ -434,6 +467,7 @@ export default function AdminPage() {
         artikelHist.forEach((a: any) => {
           if (!seenIds.has(String(a.id))) {
             seenIds.add(String(a.id));
+            const parsedPhotos = parseArticlePhotos(a.cover_image);
             historyList.push({
               id: a.id,
               type: "artikel",
@@ -441,7 +475,8 @@ export default function AdminPage() {
               submitter: a.author_name || "Pemerintah Padukuhan",
               date: a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID") : "September 2026",
               excerpt: a.excerpt || a.content.slice(0, 100),
-              foto_url: a.cover_image,
+              foto_url: parsedPhotos[0] || null,
+              foto_urls: parsedPhotos,
               status: a.status,
               rejection_reason: a.rejection_reason,
               reviewed_at: a.approved_at ? new Date(a.approved_at).toLocaleDateString("id-ID") : undefined,
@@ -504,13 +539,126 @@ export default function AdminPage() {
     }
   }, []);
 
+  // 6. Fetch Kebudayaan langsung dari Database Supabase (agenda_budaya)
+  const fetchKebudayaanFromDB = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("agenda_budaya")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (data && data.length > 0) {
+        setKebudayaanList(data);
+      } else {
+        setKebudayaanList([]);
+      }
+    } catch (err) {
+      console.warn("Fetch kebudayaan from DB notice:", err);
+    }
+  }, []);
+
   // Muat data awal dari Supabase saat masuk portal
   useEffect(() => {
     fetchQueueFromDB();
     fetchHistoryFromDB();
     fetchAparaturFromDB();
     fetchDemografiFromDB();
-  }, [fetchQueueFromDB, fetchHistoryFromDB, fetchAparaturFromDB, fetchDemografiFromDB]);
+    fetchKebudayaanFromDB();
+  }, [fetchQueueFromDB, fetchHistoryFromDB, fetchAparaturFromDB, fetchDemografiFromDB, fetchKebudayaanFromDB]);
+
+  // Handlers CRUD Kebudayaan (Pak Dukuh & Admin KKN)
+  const handleOpenAddKebudayaan = () => {
+    setKebudayaanJudul("");
+    setKebudayaanKategori("Tradisi & Adat");
+    setKebudayaanDusun("Wonosari");
+    setKebudayaanDeskripsi("");
+    setKebudayaanFotoUrl(SAMPLE_PHOTO_OPTIONS[2]?.url || "/images/backgroundpadukuhan2.jpeg");
+    setKebudayaanPreviewImage(null);
+    setShowAddKebudayaanModal(true);
+  };
+
+  const handleKebudayaanFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const localUrl = URL.createObjectURL(file);
+    setKebudayaanPreviewImage(localUrl);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setKebudayaanFotoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `kebudayaan-${Date.now()}.${fileExt}`;
+      const { data, error } = await supabase.storage
+        .from("media-padukuhan")
+        .upload(`kebudayaan/${fileName}`, file, { cacheControl: "3600", upsert: true });
+
+      if (!error && data) {
+        const { data: publicUrlData } = supabase.storage
+          .from("media-padukuhan")
+          .getPublicUrl(`kebudayaan/${fileName}`);
+        if (publicUrlData?.publicUrl) {
+          setKebudayaanFotoUrl(publicUrlData.publicUrl);
+        }
+      }
+    } catch (storageErr) {
+      console.warn("Storage upload notice (using fallback base64):", storageErr);
+    }
+  };
+
+  const handleSubmitKebudayaan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!kebudayaanJudul.trim()) return;
+
+    setIsSubmittingKebudayaan(true);
+    try {
+      const payload = {
+        nama_agenda: kebudayaanJudul.trim(),
+        kategori: kebudayaanKategori,
+        tanggal_mulai: new Date().toISOString().split("T")[0],
+        lokasi: `Dusun ${kebudayaanDusun}`,
+        deskripsi: kebudayaanDeskripsi.trim() || `Kebudayaan dan kearifan lokal Padukuhan Wonosari di Dusun ${kebudayaanDusun}.`,
+        penanggung_jawab: currentRole === "padukuh" ? "Pak Dukuh Triswanto" : "Admin Pengelola",
+        foto_cover: kebudayaanFotoUrl || "/images/backgroundpadukuhan2.jpeg",
+        is_selesai: false,
+      };
+
+      const { error } = await supabase.from("agenda_budaya").insert([payload]);
+      if (error) throw error;
+
+      await fetchKebudayaanFromDB();
+      setShowAddKebudayaanModal(false);
+      setKebudayaanJudul("");
+      setKebudayaanDeskripsi("");
+      setKebudayaanFotoUrl("");
+      setKebudayaanPreviewImage(null);
+      setAccNotification("Data kebudayaan berhasil ditambahkan dan langsung tayang di Halaman Destinasi & Budaya!");
+      setTimeout(() => setAccNotification(null), 4000);
+    } catch (err: any) {
+      console.error("Submit kebudayaan error:", err);
+      alert("Gagal menambahkan kebudayaan: " + (err.message || "Periksa koneksi database."));
+    } finally {
+      setIsSubmittingKebudayaan(false);
+    }
+  };
+
+  const handleDeleteKebudayaan = async (id: string, judul: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus agenda kebudayaan '${judul}'?`)) return;
+    try {
+      const { error } = await supabase.from("agenda_budaya").delete().eq("id", id);
+      if (error) throw error;
+      await fetchKebudayaanFromDB();
+      setAccNotification(`Agenda kebudayaan '${judul}' berhasil dihapus.`);
+      setTimeout(() => setAccNotification(null), 3000);
+    } catch (err: any) {
+      console.error("Delete kebudayaan error:", err);
+      alert("Gagal menghapus: " + (err.message || "Periksa koneksi database."));
+    }
+  };
 
   // Handlers CRUD Demografi RT
   const handleOpenAddDemografi = () => {
@@ -689,38 +837,79 @@ export default function AdminPage() {
     }
   };
 
-  // Upload file handler Warta Berita
+  // Upload file handler Warta Berita (Mendukung Lebih Dari 1 Foto)
   const handleArtikelFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const localUrl = URL.createObjectURL(file);
-    setArtikelPreviewImage(localUrl);
+    setIsUploadingArtikel(true);
+    const newUrls: string[] = [];
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setArtikelFotoUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
 
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `artikel-${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("media-padukuhan")
-        .upload(`artikel/${fileName}`, file, { cacheControl: "3600", upsert: true });
+      // Convert ke base64 sebagai fallback instan
+      const base64Promise = new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
 
-      if (!error && data) {
-        const { data: publicUrlData } = supabase.storage
+      let finalUrl = await base64Promise;
+
+      // Coba upload ke Supabase Storage media-padukuhan
+      try {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `artikel-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const { data, error } = await supabase.storage
           .from("media-padukuhan")
-          .getPublicUrl(`artikel/${fileName}`);
-        if (publicUrlData?.publicUrl) {
-          setArtikelFotoUrl(publicUrlData.publicUrl);
+          .upload(`artikel/${fileName}`, file, { cacheControl: "3600", upsert: true });
+
+        if (!error && data) {
+          const { data: publicUrlData } = supabase.storage
+            .from("media-padukuhan")
+            .getPublicUrl(`artikel/${fileName}`);
+          if (publicUrlData?.publicUrl) {
+            finalUrl = publicUrlData.publicUrl;
+          }
         }
+      } catch (storageErr) {
+        console.warn("Storage upload notice (using fallback base64):", storageErr);
       }
-    } catch (storageErr) {
-      console.warn("Storage upload notice:", storageErr);
+
+      newUrls.push(finalUrl);
     }
+
+    setArtikelFotoList((prev) => {
+      // Jika sebelumnya hanya berisi default unsplash placeholder, gantikan dengan file asli baru
+      const isDefault = prev.length === 1 && prev[0].includes("unsplash.com");
+      return isDefault ? newUrls : [...prev, ...newUrls];
+    });
+
+    setIsUploadingArtikel(false);
+    e.target.value = "";
+  };
+
+  const handleRemoveArtikelFoto = (indexToRemove: number) => {
+    setArtikelFotoList((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSetCoverArtikel = (indexToCover: number) => {
+    setArtikelFotoList((prev) => {
+      if (indexToCover <= 0 || indexToCover >= prev.length) return prev;
+      const target = prev[indexToCover];
+      const rest = prev.filter((_, idx) => idx !== indexToCover);
+      return [target, ...rest];
+    });
+  };
+
+  const handleAddArtikelUrl = () => {
+    if (!artikelUrlInput.trim()) return;
+    setArtikelFotoList((prev) => {
+      const isDefault = prev.length === 1 && prev[0].includes("unsplash.com");
+      return isDefault ? [artikelUrlInput.trim()] : [...prev, artikelUrlInput.trim()];
+    });
+    setArtikelUrlInput("");
   };
 
   // Upload file handler Aparatur / Lembaga SOTK
@@ -1060,6 +1249,13 @@ export default function AdminPage() {
     const statusVal = isDirectPublish ? "APPROVED" : "PENDING";
     const slug = `${judulArtikel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now()}`;
 
+    const finalPhotos = artikelFotoList.filter(Boolean);
+    const coverImagePayload = finalPhotos.length === 1
+      ? finalPhotos[0]
+      : finalPhotos.length > 1
+      ? JSON.stringify(finalPhotos)
+      : null;
+
     setSubmitArticleError(null);
     try {
       const { error } = await supabase.from("artikel").insert([
@@ -1070,7 +1266,7 @@ export default function AdminPage() {
           excerpt: isiArtikel.slice(0, 120) + "...",
           content: isiArtikel,
           author_name: penulis || (currentRole === "padukuh" ? "Bapak Kepala Dukuh Wonosari" : currentUser?.full_name || "Pemerintah Padukuhan Wonosari"),
-          cover_image: artikelFotoUrl,
+          cover_image: coverImagePayload,
           status: statusVal,
           rejection_reason: isDirectPublish ? "Ditambahkan langsung oleh Pak Dukuh" : null,
           approved_at: isDirectPublish ? new Date().toISOString() : null,
@@ -1099,7 +1295,10 @@ export default function AdminPage() {
     setSubmitArticleSuccess(true);
     setJudulArtikel("");
     setIsiArtikel("");
-    setArtikelPreviewImage(null);
+    setArtikelFotoList([
+      "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=800&auto=format&fit=crop",
+    ]);
+    setArtikelUrlInput("");
     setTimeout(() => setSubmitArticleSuccess(false), 4500);
   };
 
@@ -1338,7 +1537,7 @@ export default function AdminPage() {
               </button>
             )}
 
-            {/* Tab 3B: Kelola Demografi Wilayah (Pak Dukuh & Admin KKN) */}
+            {/* Tab 3B: Kelola Monografi & Demografi Wilayah (Pak Dukuh & Admin KKN) */}
             {(currentRole === "padukuh" || currentRole === "admin") && (
               <button
                 onClick={() => setActiveTab("demografi")}
@@ -1349,7 +1548,22 @@ export default function AdminPage() {
                 }`}
               >
                 <Users className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Kelola Demografi RT ({demografiList.length})</span>
+                <span>Kelola Monografi & Demografi ({demografiList.length})</span>
+              </button>
+            )}
+
+            {/* Tab 3C: Kelola Kebudayaan Padukuhan (Pak Dukuh & Admin KKN) */}
+            {(currentRole === "padukuh" || currentRole === "admin") && (
+              <button
+                onClick={() => setActiveTab("kebudayaan")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === "kebudayaan"
+                    ? "bg-[#1E251E] text-white shadow-xs"
+                    : "text-[#1E251E]/60 hover:text-[#1E251E] hover:bg-neutral-100"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Kelola Kebudayaan ({kebudayaanList.length})</span>
               </button>
             )}
 
@@ -1479,8 +1693,14 @@ export default function AdminPage() {
                     >
                       <div className="flex items-start gap-4 max-w-2xl">
                         {item.foto_url && (
-                          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-neutral-100 flex-shrink-0 border border-[#1E251E]/10">
+                          <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-neutral-100 flex-shrink-0 border border-[#1E251E]/10">
                             <img src={item.foto_url} alt={item.title} className="w-full h-full object-cover" />
+                            {item.foto_urls && item.foto_urls.length > 1 && (
+                              <span className="absolute bottom-1 right-1 bg-black/75 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                <Camera className="w-2.5 h-2.5" />
+                                <span>{item.foto_urls.length}</span>
+                              </span>
+                            )}
                           </div>
                         )}
 
@@ -2164,10 +2384,10 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <h2 className="text-lg font-black text-[#1E251E]">
-                      Kelola Data Demografi Wilayah & Kependudukan RT
+                      Kelola Data Monografi & Demografi Wilayah Kependudukan RT
                     </h2>
                     <p className="text-xs text-[#1E251E]/60 mt-0.5">
-                      Sinkronisasi langsung dengan tabel <code className="px-1.5 py-0.5 rounded bg-neutral-100 font-mono text-[11px] text-neutral-800">demografi_wilayah</code> di Supabase. Data ini tayang pada halaman Monografi Publik.
+                      Sinkronisasi langsung dengan tabel <code className="px-1.5 py-0.5 rounded bg-neutral-100 font-mono text-[11px] text-neutral-800">demografi_wilayah</code> di Supabase. Pak Dukuh dan Admin dapat leluasa mengatur, menambah, atau memperbarui monografi kependudukan per RT yang langsung tayang pada halaman Monografi Publik.
                     </p>
                   </div>
                 </div>
@@ -2492,7 +2712,7 @@ export default function AdminPage() {
                                 required
                                 value={demoJumlahKk || ""}
                                 onChange={(e) => setDemoJumlahKk(Number(e.target.value) || 0)}
-                                className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-indigo-500"
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs font-bold text-[#1E251E] focus:outline-none focus:border-indigo-500"
                               />
                             </div>
                             <div>
@@ -2503,11 +2723,11 @@ export default function AdminPage() {
                                 required
                                 value={demoJumlahJiwa || ""}
                                 onChange={(e) => setDemoJumlahJiwa(Number(e.target.value) || 0)}
-                                className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs font-bold text-indigo-700 focus:outline-none focus:border-indigo-500"
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs font-bold text-indigo-600 focus:outline-none focus:border-indigo-500"
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold text-[#1E251E]/70 mb-1">Laki-Laki</label>
+                              <label className="block text-[10px] font-bold text-[#1E251E]/70 mb-1">Laki-laki</label>
                               <input
                                 type="number"
                                 min={0}
@@ -2529,9 +2749,9 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* 3. Kelompok Umur */}
+                        {/* 3. Kelompok Usia */}
                         <div className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-3">
-                          <span className="text-xs font-bold text-emerald-900 block">Kelompok Umur</span>
+                          <span className="text-xs font-bold text-emerald-900 block">Kelompok Usia Penduduk</span>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
                               <label className="block text-[10px] font-bold text-[#1E251E]/70 mb-1">Balita (0-5 Thn)</label>
@@ -2657,6 +2877,287 @@ export default function AdminPage() {
                             className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all"
                           >
                             Simpan ke Database
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* TAB 3C: KELOLA KEBUDAYAAN PADUKUHAN (KHUSUS PAK DUKUH & ADMIN KKN) */}
+          {activeTab === "kebudayaan" && (currentRole === "padukuh" || currentRole === "admin") && (
+            <div className="space-y-6">
+              {/* Header & Action Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#1E251E]/10 shadow-xs">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-[#1E251E]">
+                      Kelola Kebudayaan & Tradisi Padukuhan Wonosari
+                    </h2>
+                    <p className="text-xs text-[#1E251E]/60 mt-0.5">
+                      Sinkronisasi langsung dengan tabel <code className="px-1.5 py-0.5 rounded bg-neutral-100 font-mono text-[11px] text-neutral-800">agenda_budaya</code> di Supabase. Data kebudayaan ini otomatis tayang pada bagian Kebudayaan di Halaman Destinasi & Wisata.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenAddKebudayaan}
+                  className="px-5 py-2.5 rounded-xl bg-[#1E251E] hover:bg-neutral-800 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all shrink-0"
+                >
+                  <PlusCircle className="w-4 h-4 text-[#9DB368]" />
+                  <span>Tambah Kebudayaan Baru</span>
+                </button>
+              </div>
+
+              {/* Grid Daftar Kebudayaan */}
+              {kebudayaanList.length === 0 ? (
+                <div className="bg-white rounded-3xl border border-[#1E251E]/10 p-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 mx-auto flex items-center justify-center mb-3">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-bold text-[#1E251E]">Belum Ada Agenda / Tradisi Kebudayaan</p>
+                  <p className="text-xs text-[#1E251E]/50 max-w-sm mx-auto mt-1 mb-4">
+                    Tabel <code className="font-mono">agenda_budaya</code> masih kosong. Tambahkan tradisi seperti Merti Dusun, Kirab Budaya, atau Kesenian Rakyat sekarang.
+                  </p>
+                  <button
+                    onClick={handleOpenAddKebudayaan}
+                    className="px-4 py-2 rounded-xl bg-[#1E251E] text-white text-xs font-bold inline-flex items-center gap-2"
+                  >
+                    <PlusCircle className="w-4 h-4 text-[#9DB368]" />
+                    <span>Tambah Kebudayaan Pertama</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {kebudayaanList.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-2xl border border-[#1E251E]/10 overflow-hidden shadow-xs flex flex-col justify-between hover:border-amber-300 transition-all group"
+                    >
+                      <div>
+                        {/* Foto Cover */}
+                        <div className="relative h-44 w-full bg-neutral-100 overflow-hidden">
+                          <img
+                            src={item.foto_cover || "/images/backgroundpadukuhan2.jpeg"}
+                            alt={item.nama_agenda}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/images/backgroundpadukuhan2.jpeg";
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                          <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold">
+                              {item.kategori || "Tradisi & Adat"}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-extrabold">
+                              {item.lokasi || "Padukuhan Wonosari"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Konten Judul & Info */}
+                        <div className="p-4">
+                          <h3 className="text-sm font-extrabold text-[#1E251E] line-clamp-2 leading-snug">
+                            {item.nama_agenda}
+                          </h3>
+                          <p className="text-xs text-[#1E251E]/60 mt-2 line-clamp-3 leading-relaxed">
+                            {item.deskripsi || "Tidak ada deskripsi rinci."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Footer Aksi */}
+                      <div className="px-4 py-3 bg-neutral-50/60 border-t border-[#1E251E]/5 flex items-center justify-between">
+                        <span className="text-[10px] text-[#1E251E]/50 font-medium">
+                          Oleh: {item.penanggung_jawab || "Pak Dukuh"}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteKebudayaan(item.id, item.nama_agenda)}
+                          className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold flex items-center gap-1 transition-colors"
+                          title="Hapus Kebudayaan"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Modal Tambah Kebudayaan Baru */}
+              <AnimatePresence>
+                {showAddKebudayaanModal && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-[#1E251E]/10 my-8"
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-[#1E251E]/10 mb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-extrabold text-[#1E251E]">
+                              Tambah Kebudayaan Baru
+                            </h3>
+                            <p className="text-[11px] text-[#1E251E]/50">
+                              Disimpan langsung ke tabel <code className="font-mono">agenda_budaya</code> Supabase
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowAddKebudayaanModal(false)}
+                          className="p-1.5 rounded-lg text-[#1E251E]/50 hover:text-[#1E251E] hover:bg-neutral-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSubmitKebudayaan} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                        {/* Judul Agenda Kebudayaan */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#1E251E] mb-1">
+                            Judul Kebudayaan / Tradisi *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Contoh: Merti Dusun & Kirab Pusaka Padukuhan Wonosari"
+                            value={kebudayaanJudul}
+                            onChange={(e) => setKebudayaanJudul(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#1E251E]/15 text-xs text-[#1E251E] font-medium focus:outline-none focus:border-amber-500 shadow-2xs"
+                          />
+                        </div>
+
+                        {/* Kategori & Dusun */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold text-[#1E251E] mb-1">
+                              Kategori Tradisi *
+                            </label>
+                            <select
+                              value={kebudayaanKategori}
+                              onChange={(e) => setKebudayaanKategori(e.target.value)}
+                              className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#1E251E]/15 text-xs font-medium text-[#1E251E] focus:outline-none focus:border-amber-500"
+                            >
+                              <option value="Tradisi & Adat">Tradisi & Adat</option>
+                              <option value="Kesenian Rakyat">Kesenian Rakyat</option>
+                              <option value="Upacara Bersih Dusun">Upacara Bersih Dusun</option>
+                              <option value="Festival Budaya">Festival Budaya</option>
+                              <option value="Kearifan Lokal">Kearifan Lokal</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-[#1E251E] mb-1">
+                              Wilayah Dusun *
+                            </label>
+                            <select
+                              value={kebudayaanDusun}
+                              onChange={(e) => setKebudayaanDusun(e.target.value as any)}
+                              className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#1E251E]/15 text-xs font-medium text-[#1E251E] focus:outline-none focus:border-amber-500"
+                            >
+                              <option value="Wonosari">Dusun Wonosari</option>
+                              <option value="Rejosari">Dusun Rejosari</option>
+                              <option value="Pajangan">Dusun Pajangan</option>
+                              <option value="Seluruh Wilayah">Seluruh Padukuhan</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Foto Cover */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#1E251E] mb-1">
+                            Foto Dokumentasi / Cover *
+                          </label>
+                          <div className="space-y-2.5">
+                            <label className="border-2 border-dashed border-[#1E251E]/15 hover:border-amber-400 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-amber-50/20">
+                              <Upload className="w-5 h-5 text-amber-600 mb-1" />
+                              <span className="text-xs font-bold text-[#1E251E]">Unggah Foto dari Perangkat</span>
+                              <span className="text-[10px] text-[#1E251E]/50">Format JPG, PNG, atau WEBP</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleKebudayaanFileChange}
+                                className="hidden"
+                              />
+                            </label>
+
+                            {/* Preview Image */}
+                            {(kebudayaanPreviewImage || kebudayaanFotoUrl) && (
+                              <div className="relative h-32 rounded-xl overflow-hidden border border-[#1E251E]/10">
+                                <img
+                                  src={kebudayaanPreviewImage || kebudayaanFotoUrl}
+                                  alt="Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setKebudayaanPreviewImage(null);
+                                    setKebudayaanFotoUrl("");
+                                  }}
+                                  className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-black"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+
+                            {/* URL Input Cadangan */}
+                            <input
+                              type="text"
+                              placeholder="Atau tempel URL gambar di sini (opsional)"
+                              value={kebudayaanFotoUrl}
+                              onChange={(e) => setKebudayaanFotoUrl(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Deskripsi Kebudayaan */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#1E251E] mb-1">
+                            Deskripsi Tradisi & Makna Budaya
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="Ceritakan sejarah, filosofi, makna tradisi, atau rangkaian acara kebudayaan ini..."
+                            value={kebudayaanDeskripsi}
+                            onChange={(e) => setKebudayaanDeskripsi(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#1E251E]/15 text-xs text-[#1E251E] focus:outline-none focus:border-amber-500 resize-none shadow-2xs"
+                          />
+                        </div>
+
+                        {/* Submit Button */}
+                        <div className="pt-3 border-t border-[#1E251E]/10 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddKebudayaanModal(false)}
+                            className="px-4 py-2 rounded-xl border border-[#1E251E]/15 text-xs font-bold text-[#1E251E]/70 hover:bg-neutral-50"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSubmittingKebudayaan}
+                            className="px-5 py-2.5 rounded-xl bg-[#1E251E] hover:bg-neutral-800 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isSubmittingKebudayaan ? "Menyimpan..." : "Publikasikan ke Halaman Budaya"}
                           </button>
                         </div>
                       </form>
@@ -3210,33 +3711,106 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Upload Foto Dokumentasi Berita dari Galeri/Berkas */}
+                {/* Upload Foto Dokumentasi Berita (Lebih Dari 1 Foto) */}
                 <div className="pt-2">
-                  <label className="block text-xs font-bold text-[#1E251E] mb-1.5">
-                    Unggah Foto Dokumentasi Warta dari Berkas / Galeri Perangkat *
-                  </label>
-                  <div className="p-4 rounded-2xl bg-[#FAF6F0] border-2 border-dashed border-sky-300 hover:border-sky-500 transition-colors flex flex-col items-center justify-center text-center relative cursor-pointer">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-[#1E251E]">
+                      Dokumentasi Foto Warta (Bisa Lebih Dari 1 Foto) *
+                    </label>
+                    <span className="text-[11px] font-semibold text-sky-700">
+                      {artikelFotoList.length} Foto Terpilih
+                    </span>
+                  </div>
+
+                  {/* Dropzone Upload Multiple */}
+                  <div className="p-4 rounded-2xl bg-[#FAF6F0] border-2 border-dashed border-sky-300 hover:border-sky-500 transition-colors flex flex-col items-center justify-center text-center relative cursor-pointer mb-3">
                     <input
                       type="file"
+                      multiple
                       accept="image/*"
                       onChange={handleArtikelFileChange}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
-                    {artikelPreviewImage || artikelFotoUrl ? (
-                      <div className="flex flex-col items-center">
-                        <div className="w-40 h-28 rounded-xl overflow-hidden mb-2 border border-[#1E251E]/10 shadow-xs">
-                          <img src={artikelPreviewImage || artikelFotoUrl} alt="Preview Warta" className="w-full h-full object-cover" />
-                        </div>
-                        <span className="text-[11px] font-bold text-sky-700">Foto Terpilih (Klik untuk mengganti)</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="w-8 h-8 text-sky-500 mb-2" />
-                        <span className="text-xs font-bold text-[#1E251E]">Pilih foto dokumentasi dari Galeri HP / Komputer</span>
-                        <span className="text-[10px] text-[#1E251E]/50 mt-0.5">Format JPG, PNG, atau WebP</span>
-                      </>
-                    )}
+                    <Upload className="w-8 h-8 text-sky-500 mb-2" />
+                    <span className="text-xs font-bold text-[#1E251E]">
+                      {isUploadingArtikel ? "Sedang memproses & mengunggah foto..." : "Pilih Satu atau Beberapa Foto Sekaligus dari Perangkat"}
+                    </span>
+                    <span className="text-[10px] text-[#1E251E]/60 mt-0.5">
+                      Dapat memilih lebih dari 1 foto (Format JPG, PNG, WebP) • Klik lagi untuk menambah foto lain
+                    </span>
                   </div>
+
+                  {/* Input URL Foto Tambahan */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="text"
+                      placeholder="Atau tempel URL gambar online di sini..."
+                      value={artikelUrlInput}
+                      onChange={(e) => setArtikelUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddArtikelUrl();
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 rounded-xl bg-white border border-[#1E251E]/10 text-xs text-[#1E251E] focus:outline-none focus:border-sky-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddArtikelUrl}
+                      className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition-colors shrink-0"
+                    >
+                      + Tambah URL
+                    </button>
+                  </div>
+
+                  {/* Galeri Preview Foto-foto Terpilih */}
+                  {artikelFotoList.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-bold text-[#1E251E]/60">
+                        Foto yang akan terbit (Foto pertama menjadi Sampul Utama):
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {artikelFotoList.map((foto, idx) => (
+                          <div
+                            key={idx}
+                            className={`relative rounded-xl overflow-hidden border-2 bg-neutral-100 shadow-2xs group flex flex-col justify-between ${
+                              idx === 0 ? "border-sky-600 ring-2 ring-sky-300/50" : "border-[#1E251E]/10"
+                            }`}
+                          >
+                            <div className="h-24 w-full relative overflow-hidden">
+                              <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                              {idx === 0 && (
+                                <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-sky-600 text-white text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                  ★ Sampul Utama
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveArtikelFoto(idx)}
+                                className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 hover:bg-red-600 text-white transition-colors"
+                                title="Hapus foto ini"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="p-1.5 bg-white flex items-center justify-between gap-1 text-[10px]">
+                              <span className="font-semibold text-[#1E251E]/70 truncate">Foto {idx + 1}</span>
+                              {idx !== 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCoverArtikel(idx)}
+                                  className="text-sky-600 font-bold hover:underline shrink-0 text-[10px]"
+                                >
+                                  Jadikan Sampul
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button

@@ -21,6 +21,7 @@ import {
   Inbox,
   PlusCircle,
   Loader2,
+  Camera,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -37,20 +38,19 @@ interface DestinasiItem {
   is_featured?: boolean;
 }
 
-interface AgendaItem {
+interface KebudayaanItem {
   id: string | number;
   nama_agenda: string;
   kategori: string;
-  tanggal_mulai: string;
-  waktu_kegiatan: string;
-  lokasi: string;
   deskripsi: string;
-  penanggung_jawab: string;
+  foto_cover?: string;
+  lokasi?: string;
+  penanggung_jawab?: string;
 }
 
 export default function WisataPage() {
   const [destinasiList, setDestinasiList] = useState<DestinasiItem[]>([]);
-  const [agendaList, setAgendaList] = useState<AgendaItem[]>([]);
+  const [kebudayaanList, setKebudayaanList] = useState<KebudayaanItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function WisataPage() {
           localStorage.removeItem("wonosari_approved_wisata");
         }
 
-        // 100% Fetch langsung dari Supabase Database
+        // 100% Fetch Destinasi dari Supabase Database
         const { data: dest, error: destErr } = await supabase
           .from("destinasi_wisata")
           .select("*")
@@ -99,20 +99,21 @@ export default function WisataPage() {
           setDestinasiList([]);
         }
 
+        // 100% Fetch Kebudayaan Padukuhan dari Supabase Database
         const { data: ag, error: agErr } = await supabase
           .from("agenda_budaya")
           .select("*")
           .order("created_at", { ascending: false });
 
         if (!agErr && ag) {
-          setAgendaList(ag);
+          setKebudayaanList(ag);
         } else {
-          setAgendaList([]);
+          setKebudayaanList([]);
         }
       } catch (err) {
         console.warn("Wisata data fetch notice:", err);
         setDestinasiList([]);
-        setAgendaList([]);
+        setKebudayaanList([]);
       } finally {
         setIsLoading(false);
       }
@@ -144,7 +145,7 @@ export default function WisataPage() {
                 Destinasi Wisata & <span className="gradient-text-sage">Tradisi Budaya</span>
               </h1>
               <p className="text-sm sm:text-base text-[#1E251E]/70 leading-relaxed">
-                Jelajahi keasrian alam dan kearifan lokal Padukuhan Wonosari (Kampung Rejosari RW 18, Kampung Wonosari RW 17, Kampung Pajangan RW 16).
+                Jelajahi keasrian alam dan kearifan lokal Padukuhan Wonosari (Dusun Rejosari RW 18, Dusun Wonosari RW 17, Dusun Pajangan RW 16).
               </p>
             </div>
 
@@ -168,7 +169,7 @@ export default function WisataPage() {
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-[#1E251E]">Spot Daya Tarik Desa</h2>
               <p className="text-xs sm:text-sm text-[#1E251E]/60 mt-1">
-                Eksplorasi titik-titik kunjungan alam, edukasi, dan budaya lokal warga 3 kampung.
+                Eksplorasi titik-titik kunjungan alam, edukasi, dan budaya lokal warga 3 dusun.
               </p>
             </div>
 
@@ -294,60 +295,100 @@ export default function WisataPage() {
         </div>
       </section>
 
-      {/* 3. Kalender Tradisi & Event Budaya */}
-      <section className="py-12 border-t border-[#EF6C85]/10 bg-white/70">
+      {/* 3. Kebudayaan Padukuhan Wonosari (Cukup Gambar & Judul) */}
+      <section className="py-14 border-t border-[#EF6C85]/10 bg-white/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCE8EC] text-[#D64E68] text-xs font-bold mb-2">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Siklus Tahunan Adat Jawa</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-[#1E251E]">Kalender Kebudayaan Dusun</h2>
-            <p className="text-xs text-[#1E251E]/65 mt-1">
-              Tradisi yang dirawat turun-temurun sebagai perekat silaturahmi dan ungkapan syukur warga kepada Sang Pencipta.
-            </p>
-          </div>
-
-          {/* Loading Agenda */}
-          {isLoading && (
-            <div className="text-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-[#EF6C85] mx-auto mb-2" />
-              <p className="text-xs text-stone-500">Memuat agenda budaya...</p>
-            </div>
-          )}
-
-          {/* Empty State Agenda */}
-          {!isLoading && agendaList.length === 0 && (
-            <div className="text-center py-12 px-4 bg-[#FAF6F0] rounded-3xl border border-dashed border-stone-300 max-w-xl mx-auto">
-              <Calendar className="w-10 h-10 text-stone-400 mx-auto mb-3" />
-              <h4 className="text-sm font-bold text-[#1E251E] mb-1">Belum Ada Agenda Kebudayaan Terjadwal</h4>
-              <p className="text-xs text-[#1E251E]/60 max-w-md mx-auto leading-relaxed">
-                Jadwal upacara adat, kerja bakti, maupun peringatan hari besar warga Padukuhan Wonosari akan diumumkan di sini.
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCE8EC] text-[#D64E68] text-xs font-bold mb-2">
+                <Landmark className="w-3.5 h-3.5" />
+                <span>Kekayaan Adat & Tradisi Leluhur</span>
+              </div>
+              <h2 className="text-2xl sm:text-4xl font-black text-[#1E251E]">
+                Kebudayaan <span className="gradient-text-coral">Padukuhan Wonosari</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-[#1E251E]/65 mt-1.5 max-w-xl">
+                Ragam tradisi, seni adat, dan guyub rukun warga Padukuhan Wonosari yang dilestarikan secara turun-temurun.
               </p>
             </div>
+
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-2 text-xs font-bold text-white bg-[#1E251E] hover:bg-neutral-800 px-4 py-2.5 rounded-2xl shadow-sm transition-all"
+            >
+              <PlusCircle className="w-4 h-4 text-[#EF6C85]" />
+              <span>+ Kelola Kebudayaan</span>
+            </Link>
+          </div>
+
+          {/* Loading Kebudayaan */}
+          {isLoading && (
+            <div className="text-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-[#EF6C85] mx-auto mb-2" />
+              <p className="text-xs text-stone-500">Memuat data kebudayaan...</p>
+            </div>
           )}
 
-          {!isLoading && agendaList.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {agendaList.map((agenda) => (
+          {/* Empty State Kebudayaan */}
+          {!isLoading && kebudayaanList.length === 0 && (
+            <div className="text-center py-14 px-4 bg-[#FAF6F0] rounded-3xl border border-dashed border-stone-300 max-w-xl mx-auto shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-[#FCE8EC] flex items-center justify-center mx-auto mb-3 text-[#EF6C85]">
+                <Landmark className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-[#1E251E] mb-1">Belum Ada Kebudayaan yang Ditambahkan</h4>
+              <p className="text-xs text-[#1E251E]/60 max-w-md mx-auto mb-5 leading-relaxed">
+                Dokumentasi tradisi, adat istiadat, dan kesenian warga Padukuhan Wonosari dapat ditambahkan langsung oleh Bapak Kepala Dukuh atau Admin via panel kendali.
+              </p>
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-2 bg-[#EF6C85] hover:bg-[#D9556E] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Tambah Kebudayaan Sekarang</span>
+              </Link>
+            </div>
+          )}
+
+          {/* List Kebudayaan (Cukup Gambar & Judul Saja) */}
+          {!isLoading && kebudayaanList.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {kebudayaanList.map((item) => (
                 <div
-                  key={agenda.id}
-                  className="bg-white rounded-3xl border border-[#EF6C85]/20 p-6 shadow-xs flex flex-col justify-between"
+                  key={item.id}
+                  className="group relative rounded-3xl overflow-hidden shadow-xs hover:shadow-xl border border-[#EF6C85]/20 bg-white transition-all duration-300 flex flex-col"
                 >
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6F0] text-[11px] font-bold text-[#EF6C85] border border-[#EF6C85]/20 mb-3">
-                      <Clock className="w-3 h-3" />
-                      <span>{agenda.tanggal_mulai}</span>
+                  {/* GAMBAR KEBUDAYAAN */}
+                  <div className="relative h-64 w-full overflow-hidden bg-neutral-100">
+                    {item.foto_cover ? (
+                      <img
+                        src={item.foto_cover}
+                        alt={item.nama_agenda}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#FAF6F0] via-[#FCE8EC]/50 to-[#EBF2DC] flex items-center justify-center text-[#EF6C85]/40">
+                        <Landmark className="w-16 h-16" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent pointer-events-none" />
+
+                    {/* JUDUL & KATEGORI DI ATAS GAMBAR */}
+                    <div className="absolute bottom-0 inset-x-0 p-5 z-10">
+                      {item.kategori && (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold mb-2 border border-white/30">
+                          {item.kategori}
+                        </span>
+                      )}
+                      <h3 className="text-lg sm:text-xl font-black text-white leading-snug drop-shadow-md">
+                        {item.nama_agenda}
+                      </h3>
+                      {item.deskripsi && (
+                        <p className="text-xs text-white/80 line-clamp-2 mt-1.5 leading-relaxed drop-shadow-sm font-normal">
+                          {item.deskripsi}
+                        </p>
+                      )}
                     </div>
-                    <h3 className="text-base font-black text-[#1E251E] mb-2">{agenda.nama_agenda}</h3>
-                    <p className="text-xs text-[#1E251E]/60 mb-2 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-[#9DB368]" />
-                      <span>{agenda.lokasi}</span>
-                    </p>
-                    <p className="text-xs text-[#1E251E]/75 leading-relaxed mb-4">{agenda.deskripsi}</p>
-                  </div>
-                  <div className="pt-3 border-t border-[#1E251E]/5 text-[11px] text-[#1E251E]/60">
-                    <strong>Penyelenggara:</strong> {agenda.penanggung_jawab}
                   </div>
                 </div>
               ))}

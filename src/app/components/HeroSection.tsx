@@ -83,7 +83,7 @@ export default function HeroSection() {
           className="text-sm sm:text-base lg:text-lg text-white/90 leading-relaxed mb-6 max-w-2xl mx-auto drop-shadow-sm font-normal"
         >
           Harmoni kehidupan agraris, kebersamaan gotong-royong, serta geliat komoditas
-          lokal dan ekonomi warga di tiga kampung berdaya:{" "}
+          lokal dan ekonomi warga di tiga dusun berdaya:{" "}
           <strong className="text-emerald-300 font-bold">Rejosari</strong>,{" "}
           <strong className="text-rose-300 font-bold">Wonosari</strong>, dan{" "}
           <strong className="text-emerald-300 font-bold">Pajangan</strong>.
@@ -97,9 +97,9 @@ export default function HeroSection() {
           className="flex flex-wrap items-center justify-center gap-2 mb-5"
         >
           {[
-            { icon: Wheat, name: "Kampung Rejosari", rw: "RW 18", color: "border-emerald-400/40 text-emerald-200" },
-            { icon: Home, name: "Kampung Wonosari", rw: "RW 17", color: "border-rose-400/40 text-rose-200" },
-            { icon: Leaf, name: "Kampung Pajangan", rw: "RW 16", color: "border-emerald-400/40 text-emerald-200" },
+            { icon: Wheat, name: "Dusun Rejosari", rw: "RW 18", color: "border-emerald-400/40 text-emerald-200" },
+            { icon: Home, name: "Dusun Wonosari", rw: "RW 17", color: "border-rose-400/40 text-rose-200" },
+            { icon: Leaf, name: "Dusun Pajangan", rw: "RW 16", color: "border-emerald-400/40 text-emerald-200" },
           ].map((dusun) => {
             const IconComp = dusun.icon;
             return (

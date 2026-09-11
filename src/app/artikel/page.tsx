@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   Newspaper,
   ChevronRight,
+  ChevronLeft,
   Home,
   Calendar,
   User,
@@ -37,7 +38,8 @@ interface ArticleItem {
   author_name: string;
   created_at: string;
   views_count?: number;
-  image_url?: string;
+  image_url?: string | null;
+  images: string[];
 }
 
 interface GaleriItem {
@@ -67,6 +69,7 @@ export default function ArtikelPage() {
   const [selectedKategori, setSelectedKategori] = useState("Semua Kategori");
   const [searchQuery, setSearchQuery] = useState("");
   const [readModal, setReadModal] = useState<ArticleItem | null>(null);
+  const [modalPhotoIdx, setModalPhotoIdx] = useState(0);
   const [activePhotoModal, setActivePhotoModal] = useState<GaleriItem | null>(null);
 
   useEffect(() => {
@@ -85,18 +88,36 @@ export default function ArtikelPage() {
           .order("created_at", { ascending: false });
 
         if (!artErr && art) {
-          const mappedArticles = art.map((a: any) => ({
-            id: a.id,
-            title: a.title || a.judul || "Warta Padukuhan",
-            slug: a.slug || `artikel-${a.id}`,
-            category: a.category || a.kategori || "Kabar Desa",
-            excerpt: a.excerpt || (a.content ? a.content.substring(0, 160) + "..." : ""),
-            content: a.content || a.isi || "",
-            author_name: a.author_name || a.penulis || "Pengurus Padukuhan",
-            created_at: a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "Terbaru",
-            views_count: a.views_count || 0,
-            image_url: a.cover_image || a.image_url || a.foto_url || null,
-          }));
+          const mappedArticles = art.map((a: any) => {
+            const rawCover = a.cover_image || a.image_url || a.foto_url || null;
+            let images: string[] = [];
+            if (rawCover) {
+              const trimmed = typeof rawCover === "string" ? rawCover.trim() : "";
+              if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                  const parsed = JSON.parse(trimmed);
+                  if (Array.isArray(parsed)) images = parsed.filter(Boolean);
+                } catch (e) {}
+              }
+              if (images.length === 0 && rawCover) {
+                images = [rawCover];
+              }
+            }
+
+            return {
+              id: a.id,
+              title: a.title || a.judul || "Warta Padukuhan",
+              slug: a.slug || `artikel-${a.id}`,
+              category: a.category || a.kategori || "Kabar Desa",
+              excerpt: a.excerpt || (a.content ? a.content.substring(0, 160) + "..." : ""),
+              content: a.content || a.isi || "",
+              author_name: a.author_name || a.penulis || "Pengurus Padukuhan",
+              created_at: a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "Terbaru",
+              views_count: a.views_count || 0,
+              image_url: images[0] || null,
+              images: images,
+            };
+          });
           setArticles(mappedArticles);
         } else {
           setArticles([]);
@@ -168,7 +189,7 @@ export default function ArtikelPage() {
                 Warta & Dokumentasi <span className="gradient-text-coral">Padukuhan</span>
               </h1>
               <p className="text-sm sm:text-base text-[#1E251E]/70 leading-relaxed">
-                Kumpulan kabar berita kegiatan warga, informasi pembangunan padukuhan, serta arsip foto kebersamaan masyarakat di Kampung Rejosari, Wonosari, dan Pajangan.
+                Kumpulan kabar berita kegiatan warga, informasi pembangunan padukuhan, serta arsip foto kebersamaan masyarakat di Dusun Rejosari, Wonosari, dan Pajangan.
               </p>
             </div>
 
@@ -320,10 +341,16 @@ export default function ArtikelPage() {
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
-                            <div className="absolute top-3 left-3 z-10">
+                            <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
                               <span className="px-3 py-1 rounded-full bg-[#EF6C85] text-white text-[10px] font-extrabold shadow-xs">
                                 {item.category}
                               </span>
+                              {item.images && item.images.length > 1 && (
+                                <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
+                                  <Camera className="w-3 h-3 text-[#EF6C85]" />
+                                  <span>{item.images.length} Foto</span>
+                                </span>
+                              )}
                             </div>
 
                             <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 text-[11px] text-white/90 font-medium bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-full">
@@ -362,7 +389,10 @@ export default function ArtikelPage() {
                         </div>
 
                         <button
-                          onClick={() => setReadModal(item)}
+                          onClick={() => {
+                            setReadModal(item);
+                            setModalPhotoIdx(0);
+                          }}
                           className="px-4 py-2 rounded-xl bg-[#FAF6F0] hover:bg-[#FCE8EC] text-[#EF6C85] text-xs font-bold flex items-center gap-1.5 transition-colors"
                         >
                           <span>Baca Warta</span>
@@ -481,10 +511,71 @@ export default function ArtikelPage() {
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Cover Gambar di dalam Modal */}
-              {readModal.image_url && (
-                <div className="w-full h-64 rounded-2xl overflow-hidden mb-5">
-                  <img src={readModal.image_url} alt={readModal.title} className="w-full h-full object-cover" />
+              {/* Galeri Gambar di dalam Modal (Mendukung Multi-Foto) */}
+              {readModal.images && readModal.images.length > 0 && (
+                <div className="mb-6">
+                  {/* Foto Utama Aktif dengan Navigasi Carousel */}
+                  <div className="relative w-full h-72 sm:h-96 rounded-2xl overflow-hidden bg-black/5 border border-[#1E251E]/10 group">
+                    <img
+                      src={readModal.images[modalPhotoIdx] || readModal.images[0]}
+                      alt={`${readModal.title} - Foto ${modalPhotoIdx + 1}`}
+                      className="w-full h-full object-contain bg-black/90"
+                    />
+
+                    {/* Badge Indikator Foto */}
+                    <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                      <Camera className="w-3.5 h-3.5 text-[#EF6C85]" />
+                      <span>Foto {modalPhotoIdx + 1} dari {readModal.images.length}</span>
+                    </div>
+
+                    {/* Tombol Navigasi Prev/Next jika > 1 foto */}
+                    {readModal.images.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalPhotoIdx((prev) => (prev > 0 ? prev - 1 : readModal.images.length - 1));
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 shadow-md cursor-pointer"
+                          title="Foto Sebelumnya"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalPhotoIdx((prev) => (prev < readModal.images.length - 1 ? prev + 1 : 0));
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 shadow-md cursor-pointer"
+                          title="Foto Berikutnya"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Thumbnail Row jika lebih dari 1 foto */}
+                  {readModal.images.length > 1 && (
+                    <div className="flex items-center gap-2.5 mt-3 overflow-x-auto pb-1 max-w-full">
+                      {readModal.images.map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setModalPhotoIdx(i)}
+                          className={`relative w-16 h-14 sm:w-20 sm:h-16 rounded-xl overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${
+                            modalPhotoIdx === i
+                              ? "border-[#EF6C85] ring-2 ring-[#EF6C85]/30 scale-105 shadow-sm"
+                              : "border-transparent opacity-60 hover:opacity-100"
+                          }`}
+                        >
+                          <img src={img} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

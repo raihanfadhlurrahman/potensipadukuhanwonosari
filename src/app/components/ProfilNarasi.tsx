@@ -45,9 +45,9 @@ export default function ProfilNarasi() {
               <p className="text-sm sm:text-base text-[#1E251E]/75 leading-relaxed">
                 Padukuhan Wonosari merupakan salah satu padukuhan di Kalurahan
                 Wedomartani, Kapanewon Ngemplak, Kabupaten Sleman, Daerah Istimewa
-                Yogyakarta. Wilayah ini terdiri dari tiga kampung yang memiliki karakter
-                unik masing-masing: Kampung Rejosari (RW 18), Kampung Wonosari (RW 17),
-                dan Kampung Pajangan (RW 16).
+                Yogyakarta. Wilayah ini terdiri dari tiga dusun yang memiliki karakter
+                unik masing-masing: Dusun Rejosari (RW 18), Dusun Wonosari (RW 17),
+                dan Dusun Pajangan (RW 16).
               </p>
 
               <p className="text-sm sm:text-base text-[#1E251E]/75 leading-relaxed">
@@ -60,7 +60,7 @@ export default function ProfilNarasi() {
               <div className="flex gap-4 pt-2">
                 <div className="flex-1 bg-[#FAF6F0] rounded-xl p-4 border border-[#9DB368]/20">
                   <div className="text-2xl font-extrabold text-[#EF6C85]">3</div>
-                  <div className="text-xs font-semibold text-[#1E251E]/70">Kampung Berdaya</div>
+                  <div className="text-xs font-semibold text-[#1E251E]/70">Dusun Berdaya</div>
                 </div>
                 <div className="flex-1 bg-[#FAF6F0] rounded-xl p-4 border border-[#EF6C85]/20">
                   <div className="text-2xl font-extrabold text-[#9DB368]">5 RT</div>

@@ -81,7 +81,7 @@ export default function Footer() {
             <p className="text-xs text-white/70 max-w-md leading-relaxed mb-4">
               Portal informasi publik dan etalase digital potensi desa yang dikembangkan untuk
               mempromosikan kemandirian UMKM, pariwisata lokal, serta keterbukaan informasi bagi
-              warga Kampung Rejosari, Wonosari, dan Pajangan.
+              warga Dusun Rejosari, Wonosari, dan Pajangan.
             </p>
 
             {/* Contact Info */}

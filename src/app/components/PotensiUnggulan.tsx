@@ -94,7 +94,7 @@ export default function PotensiUnggulan() {
             </span>
           </h2>
           <p className="text-sm sm:text-base text-white/95 max-w-2xl mx-auto leading-relaxed drop-shadow-md font-medium">
-            Keunggulan komoditas pertanian, olahan pangan lokal, serta inovasi lingkungan yang menjadi penggerak kesejahteraan masyarakat di tiga kampung.
+            Keunggulan komoditas pertanian, olahan pangan lokal, serta inovasi lingkungan yang menjadi penggerak kesejahteraan masyarakat di tiga dusun.
           </p>
         </AnimatedSection>
 
