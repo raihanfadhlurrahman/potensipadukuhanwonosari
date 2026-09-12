@@ -21,6 +21,7 @@ import {
   Quote,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import StrukturOrganisasiSlider from "../components/StrukturOrganisasiSlider";
 
 interface ProfilData {
   nama_padukuhan: string;
@@ -341,6 +342,19 @@ export default function ProfilDesaPage() {
             >
               <span>⚙️ Kelola Struktur (Pak Dukuh)</span>
             </Link>
+          </div>
+
+          {/* Visual Showcase: Bagan Struktur SOTK & Kelembagaan with Click + Zoom */}
+          <StrukturOrganisasiSlider />
+
+          {/* Direktori Personil Aparatur & Pengurus */}
+          <div className="pt-8 border-t border-[#1E251E]/10 mb-4">
+            <h3 className="text-lg font-black text-[#1E251E] mb-1">
+              Direktori Aparatur & Personil Kelembagaan
+            </h3>
+            <p className="text-xs text-[#1E251E]/60 mb-4">
+              Daftar pejabat dan personil kepengurusan wilayah Padukuhan Wonosari. Gunakan filter dusun untuk memilah kontak perwakilan.
+            </p>
           </div>
 
           {/* Filter Wilayah Dusun */}
